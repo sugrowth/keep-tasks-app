@@ -170,19 +170,48 @@
                 isConfigured.value = true;
                 window.location.reload();
             };
+// Replace the callAppsScript function in your HTML file with this fixed version:
 
-            const callAppsScript = async (functionName, payload = null) => {
-                isLoading.value = true;
-                error.value = null;
-                try {
-                    const resource = payload ? { function: functionName, parameters: [payload] } : { function: functionName };
-                    const response = await gapi.client.script.scripts.run({ scriptId: config.value.scriptId, resource });
-                    if (response.result.error) throw response.result.error;
-                    return response.result.response.result;
-                } catch (err) {
-                    error.value = `Error calling script: ${err.details || err.message}`;
-                } finally { isLoading.value = false; }
-            };
+const callAppsScript = async (functionName, payload = null) => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+        const resource = { 
+            function: 'call',  // Always call the 'call' function
+            parameters: [functionName, payload]  // Pass the actual function name as a parameter
+        };
+        
+        console.log('Calling Apps Script with:', resource); // Debug log
+        
+        const response = await gapi.client.script.scripts.run({ 
+            scriptId: config.value.scriptId, 
+            resource 
+        });
+        
+        console.log('Apps Script response:', response); // Debug log
+        
+        if (response.result.error) {
+            throw new Error(response.result.error.details || response.result.error.message);
+        }
+        
+        // The response structure is: response.result.response.result
+        const result = response.result.response.result;
+        
+        if (result.status === 'error') {
+            throw new Error(result.message);
+        }
+        
+        return result.result; // Return the actual data
+        
+    } catch (err) {
+        const errorMessage = err.details?.[0]?.errorMessage || err.message || 'Unknown error';
+        error.value = `Error calling script: ${errorMessage}`;
+        console.error('Full error:', err);
+        throw err;
+    } finally { 
+        isLoading.value = false; 
+    }
+};
 
             const fetchTasks = async () => {
                 tasks.value = await callAppsScript('getTasks');
@@ -271,4 +300,5 @@
 </script>
 </body>
 </html>
+
 
