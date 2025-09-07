@@ -3,239 +3,241 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keep-like Tasks App (Sheets ↔ Calendar)</title>
+    <title>Keep-like Tasks App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Note: api.js is loaded dynamically in the script now -->
+    <script src="https://unpkg.com/vue@3"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .modal-bg { background-color: rgba(0,0,0,0.5); }
         [v-cloak] { display: none; }
-        .notification {
-            transition: opacity 0.5s, transform 0.5s;
-        }
+        .task-item:hover .task-actions { opacity: 1; }
+        .task-actions { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .modal-bg { background-color: rgba(0,0,0,0.5); }
+        .notification { transition: opacity 0.5s, transform 0.5s; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <div id="app" v-cloak class="flex flex-col min-h-screen">
+<div id="app" v-cloak class="flex flex-col min-h-screen">
 
-        <!-- Header -->
-        <header class="bg-white shadow-md sticky top-0 z-20">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center">
-                        <svg class="h-8 w-8 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-20">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <svg class="h-8 w-8 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    <h1 class="text-xl font-semibold ml-3 text-gray-800">My Tasks</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button @click="openSettings" class="p-2 rounded-full hover:bg-gray-200 focus:outline-none">
+                        <svg class="h-6 w-6 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <h1 class="text-xl font-semibold ml-3">Keep-like Tasks</h1>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                         <button @click="openSettings" class="p-2 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                        <button v-if="!isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition duration-150">
-                            Connect Google Account
-                        </button>
-                        <div v-else class="flex items-center">
-                            <span class="text-sm font-medium mr-3">{{ userProfile ? userProfile.getName() : '' }}</span>
-                            <button @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition duration-150">
-                                Sign Out
-                            </button>
-                        </div>
-                    </div>
+                    </button>
+                    <button v-if="!isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none transition duration-150">
+                        Connect Google Account
+                    </button>
+                    <button v-else @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none transition duration-150">
+                        Sign Out
+                    </button>
                 </div>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <!-- Main Content -->
-        <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
-             <!-- Setup Error Message -->
-            <div v-if="setupError" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md" role="alert">
-                <p class="font-bold text-lg">Configuration Required</p>
-                <p>{{ setupError }}</p>
-            </div>
-
-            <!-- Loading and Error States -->
-            <div v-if="loading" class="text-center py-10">
-                <svg class="animate-spin h-8 w-8 text-yellow-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <p class="mt-4 text-lg font-medium">Loading Tasks...</p>
-            </div>
-            <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
-                <strong class="font-bold">Error:</strong>
-                <span class="block sm:inline">{{ error }}</span>
-            </div>
-
-            <!-- Task Management Area -->
-            <div v-if="isSignedIn && !loading && !error && !setupError" class="space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow">
-                    <div class="flex flex-wrap items-center gap-4">
-                         <input type="text" v-model="filters.search" placeholder="Search tasks..." class="w-full sm:w-auto form-input rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500">
-                    </div>
-                    <div>
-                        <button @click="openTaskModal(null)" class="bg-yellow-500 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition duration-150">
-                            Add Task
-                        </button>
-                    </div>
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Configuration Modal -->
+        <div v-if="showConfigModal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+                <h2 class="text-2xl font-bold mb-4">Initial Setup</h2>
+                <p class="mb-4 text-gray-600">Please provide your credentials and Sheet ID. This is stored securely in your browser.</p>
+                <div class="space-y-4">
+                    <input v-model="config.apiKey" placeholder="Your API Key" class="w-full p-3 border rounded-lg" type="password">
+                    <input v-model="config.clientId" placeholder="Your Client ID" class="w-full p-3 border rounded-lg" type="password">
+                    <input v-model="config.sheetId" placeholder="Your Google Sheet ID" class="w-full p-3 border rounded-lg">
                 </div>
-                <div class="bg-white p-4 rounded-lg shadow">
-                     <h2 class="text-2xl font-bold mb-4">Tasks</h2>
-                     <div v-if="filteredTasks.length === 0" class="text-center py-10 text-gray-500">
-                        <p>No tasks found. Add a new task to get started!</p>
-                     </div>
-                     <ul v-else class="space-y-3">
-                        <li v-for="task in filteredTasks" :key="task._TaskID" @click="openTaskModal(task)" class="p-4 border rounded-lg hover:shadow-md hover:border-yellow-500 cursor-pointer transition-shadow duration-150 bg-gray-50 flex items-start justify-between">
-                            <div class="flex items-start">
-                                <input type="checkbox" :checked="task.IsItCompleted === 'TRUE'" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
-                                <div class="ml-4">
-                                    <p class="font-semibold text-lg" :class="{ 'line-through text-gray-500': task.IsItCompleted === 'TRUE' }">{{ task.Subject }}</p>
-                                    <p class="text-sm text-gray-600">{{ formatTaskDate(task) }}</p>
-                                    <div class="mt-2 flex flex-wrap gap-2">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{{ task.Category }}</span>
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full" :class="getPriorityClass(task.Priority)">{{ task.Priority }}</span>
-                                        <span v-for="tag in (task.Tags || '').split(',').filter(t => t)" :key="tag" class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-700">#{{ tag.trim() }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div v-if="task.Recurrence" class="mt-1 text-gray-500">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.899 2.186A1 1 0 0116 8.39V7a1 1 0 012 0v4a1 1 0 01-1 1h-4a1 1 0 010-2h2.39A5 5 0 007 6.101V7a1 1 0 01-2 0V3a1 1 0 011-1zm12 9a1 1 0 011-1h4a1 1 0 010 2h-2.39a5.002 5.002 0 00-7.899-3.899A1 1 0 017 8.611V10a1 1 0 01-2 0v-4a1 1 0 011-1h4a1 1 0 010 2H8.101A7.002 7.002 0 0116 13.899V16a1 1 0 012 0v1a1 1 0 01-1 1h-2.101a7.002 7.002 0 01-11.899-2.186A1 1 0 014 11.61V13a1 1 0 01-2 0v-4a1 1 0 011-1h4a1 1 0 110 2H3.61A5 5 0 008 13.899V13a1 1 0 012 0v4a1 1 0 01-1 1h-4a1 1 0 110-2h2.39A7.002 7.002 0 018 7.101V8a1 1 0 012 0v-1z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                        </li>
-                     </ul>
+                <div class="mt-6 flex justify-end">
+                    <button @click="saveConfigAndInit" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">Save & Initialize</button>
                 </div>
             </div>
-            
-            <!-- Initial Setup Instructions -->
-            <div v-if="isSignedIn && !settings.sheetId && !setupError" class="text-center p-8 bg-white rounded-lg shadow">
-                <h2 class="text-2xl font-bold mb-4">Welcome! Let's Get Started.</h2>
-                <p class="mb-6 text-lg">To begin, you need to set up your Google Sheet and connect it to this app.</p>
-                <button @click="openSettings" class="bg-yellow-500 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition duration-150">
-                    Go to Settings
+        </div>
+
+        <!-- Loading and Error States -->
+        <div v-if="isLoading" class="text-center py-10">
+            <svg class="animate-spin h-8 w-8 text-yellow-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="mt-4 text-lg font-medium text-gray-600">Loading...</p>
+        </div>
+        <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md" role="alert">
+            <p class="font-bold">Error</p>
+            <p>{{ error }}</p>
+        </div>
+
+        <!-- Task Management Area -->
+        <div v-if="isConfigured && !isLoading && isSignedIn && !error">
+            <div class="mb-6">
+                <button @click="openTaskModal(null)" class="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg shadow-sm flex items-center justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    <span>Add a new task</span>
                 </button>
             </div>
-        </main>
-
-        <!-- Footer -->
-        <footer class="bg-white mt-8 py-4 border-t">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-                Keep-like Tasks App | Syncs with Google Sheets & Calendar
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                 <h2 class="text-2xl font-bold mb-4 text-gray-800">Tasks</h2>
+                 <div v-if="activeTasks.length === 0" class="text-center py-10 text-gray-500">
+                    <p>No active tasks. Well done!</p>
+                 </div>
+                 <ul v-else class="space-y-3">
+                    <li v-for="task in activeTasks" :key="task._TaskID" @click="openTaskModal(task)" class="p-4 border rounded-lg hover:shadow-md hover:border-yellow-500 cursor-pointer transition-shadow duration-150 bg-gray-50 flex items-start justify-between">
+                        <div class="flex items-start">
+                            <input type="checkbox" :checked="task['Is it Completed'] === 'TRUE'" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
+                            <div class="ml-4">
+                                <p class="font-semibold text-lg text-gray-900">{{ task.Subject }}</p>
+                                <p class="text-sm text-gray-600">{{ formatTaskDate(task) }}</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{{ task.Category }}</span>
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full" :class="getPriorityClass(task.Priority)">{{ task.Priority }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                 </ul>
             </div>
-        </footer>
+            <div class="mt-8" v-if="completedTasks.length > 0">
+                <h2 @click="showCompleted = !showCompleted" class="text-xl font-semibold text-gray-600 mb-2 cursor-pointer flex items-center">
+                    Completed
+                    <svg :class="{ 'rotate-180': !showCompleted }" class="h-5 w-5 ml-2 transform transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                </h2>
+                <div v-show="showCompleted" class="bg-white rounded-lg shadow-md p-4">
+                    <ul class="space-y-3">
+                        <li v-for="task in completedTasks" :key="task._TaskID" class="p-4 border rounded-lg bg-gray-50 flex items-start">
+                             <input type="checkbox" :checked="task['Is it Completed'] === 'TRUE'" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
+                            <div class="ml-4">
+                                <p class="font-semibold text-gray-500 line-through">{{ task.Subject }}</p>
+                                <p class="text-sm text-gray-400">{{ formatTaskDate(task) }}</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
 
-        <!-- Settings Modal, Task Modal, Confirmation Dialog, Notification Toast... -->
-        <!-- All modal and notification HTML is included here as before -->
+    <!-- Footer -->
+    <footer class="bg-white mt-8 py-4 border-t">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
+            Keep-like Tasks App | Securely syncing with Google Sheets & Calendar
+        </div>
+    </footer>
 
+    <!-- Task Modal -->
+    <div v-if="showTaskModal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 max-h-screen overflow-y-auto" @click.away="closeTaskModal">
+            <h2 class="text-2xl font-bold mb-4">{{ editingTask ? 'Edit Task' : 'Add New Task' }}</h2>
+            <form @submit.prevent="saveTask">
+                <!-- Form fields will go here -->
+                <div class="flex justify-end mt-6 space-x-3">
+                    <button type="button" @click="closeTaskModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Save Task</button>
+                </div>
+            </form>
+        </div>
     </div>
+</div>
 
-    <script src="https://unpkg.com/vue@3"></script>
-    <script src="config.js"></script> <!-- Loads the API keys -->
-    <script>
+<script>
+    // Vue.js code from the previous complete version
     const { createApp } = Vue;
 
-    // The keys are now in config.js and will be available globally
-
-    const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest", "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+    const DISCOVERY_DOCS = [
+        "https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest",
+        "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"
+    ];
     const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar';
 
     const app = createApp({
         data() {
             return {
-                gapiInited: false,
-                gisInited: false,
-                tokenClient: null,
+                config: { apiKey: '', clientId: '', sheetId: '' },
+                showConfigModal: false,
+                isConfigured: false,
+                isLoading: true,
                 isSignedIn: false,
-                userProfile: null,
                 tasks: [],
-                loading: false,
-                error: null,
-                setupError: null,
-                settings: {
-                    sheetId: null,
-                    calendarId: 'primary',
-                    timezone: 'America/Toronto',
-                },
-                tempSettings: {},
-                showSettings: false,
-                calendars: [],
+                headers: [],
+                tokenClient: null,
+                showCompleted: false,
                 showTaskModal: false,
                 editingTask: null,
                 currentTask: {},
-                filters: {
-                    search: ''
-                },
-                notification: {
-                    show: false,
-                    message: '',
-                    type: 'success'
-                },
-                confirmDialog: {
-                    show: false,
-                    title: '',
-                    message: '',
-                    onConfirm: null,
-                },
+                error: null,
             }
         },
         computed: {
-            filteredTasks() {
-                if (!this.filters.search) {
-                    return this.tasks;
-                }
-                const searchTerm = this.filters.search.toLowerCase();
-                return this.tasks.filter(task => {
-                    return task.Subject?.toLowerCase().includes(searchTerm) ||
-                           task.Category?.toLowerCase().includes(searchTerm) ||
-                           task.Tags?.toLowerCase().includes(searchTerm);
-                });
+            activeTasks() {
+                return this.tasks.filter(t => t['Is it Completed'] !== 'TRUE');
+            },
+            completedTasks() {
+                return this.tasks.filter(t => t['Is it Completed'] === 'TRUE');
             }
         },
         methods: {
-            gapiLoaded() {
-                gapi.load('client', this.initializeGapiClient);
+            loadConfig() {
+                const savedConfig = localStorage.getItem('tasksAppConfig');
+                if (savedConfig) {
+                    this.config = JSON.parse(savedConfig);
+                    if (this.config.apiKey && this.config.clientId && this.config.sheetId) {
+                        this.isConfigured = true;
+                        this.gapiLoaded();
+                    } else { this.showConfigModal = true; this.isLoading = false; }
+                } else { this.showConfigModal = true; this.isLoading = false; }
             },
+            saveConfigAndInit() {
+                if (!this.config.apiKey || !this.config.clientId || !this.config.sheetId) {
+                    alert("All three fields are required.");
+                    return;
+                }
+                localStorage.setItem('tasksAppConfig', JSON.stringify(this.config));
+                location.reload(); 
+            },
+            gapiLoaded() { gapi.load('client', this.initializeGapiClient); },
             async initializeGapiClient() {
-                await gapi.client.init({
-                    apiKey: API_KEY, // This is now loaded from config.js
-                    discoveryDocs: DISCOVERY_DOCS,
-                });
-                this.gapiInited = true;
-                this.checkAuthStatus();
+                try {
+                    await gapi.client.init({
+                        apiKey: this.config.apiKey,
+                        discoveryDocs: DISCOVERY_DOCS,
+                    });
+                    this.gisLoaded();
+                } catch (error) {
+                    this.error = "Failed to initialize Google Client. Please check your API Key.";
+                    console.error("Error initializing GAPI client", error);
+                    localStorage.removeItem('tasksAppConfig');
+                    this.isLoading = false;
+                }
             },
             gisLoaded() {
                 this.tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID, // This is now loaded from config.js
+                    client_id: this.config.clientId,
                     scope: SCOPES,
-                    callback: '',
+                    callback: (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) { this.handleSignIn(tokenResponse); } 
+                        else if (tokenResponse && tokenResponse.error) {
+                            this.error = `Google Sign-In failed: ${tokenResponse.error_description || 'Unknown error'}`;
+                            console.error("OAuth Error:", tokenResponse.error);
+                            this.isLoading = false;
+                        }
+                    },
                 });
-                this.gisInited = true;
-                this.checkAuthStatus();
+                this.isLoading = false;
             },
-            checkAuthStatus() {
-                if (gapi.client.getToken() === null) {
-                    this.isSignedIn = false;
-                } else {
-                    this.isSignedIn = true;
-                    this.loadUserProfile();
-                    this.loadSettings();
-                }
+            handleSignIn() {
+                this.isSignedIn = true;
+                this.loadTasks();
             },
             handleAuthClick() {
-                this.tokenClient.callback = async (resp) => {
-                    if (resp.error !== undefined) {
-                        throw (resp);
-                    }
-                    this.isSignedIn = true;
-                    await this.loadUserProfile();
-                    await this.loadSettings();
-                    if (this.calendars.length === 0) {
-                        this.loadCalendars();
-                    }
-                };
+                this.isLoading = true;
+                this.error = null;
                 if (gapi.client.getToken() === null) {
                     this.tokenClient.requestAccessToken({ prompt: 'consent' });
                 } else {
@@ -248,170 +250,74 @@
                     google.accounts.oauth2.revoke(token.access_token, () => {
                         gapi.client.setToken('');
                         this.isSignedIn = false;
-                        this.userProfile = null;
                         this.tasks = [];
-                        this.settings.sheetId = null;
-                        localStorage.removeItem('tasksAppSettings');
                     });
-                }
-            },
-            async loadUserProfile() {
-                try {
-                     const response = await gapi.client.oauth2.userinfo.get();
-                     this.userProfile = {
-                         getName: () => response.result.name,
-                         getEmail: () => response.result.email,
-                     };
-                } catch (err) {
-                    console.error("Error loading user profile", err);
-                    this.error = "Could not load user profile.";
-                }
-            },
-            openSettings() {
-                this.tempSettings = { ...this.settings };
-                this.showSettings = true;
-                if(this.isSignedIn && this.calendars.length === 0){
-                    this.loadCalendars();
-                }
-            },
-            saveSettings() {
-                this.settings = { ...this.tempSettings };
-                localStorage.setItem('tasksAppSettings', JSON.stringify(this.settings));
-                this.showSettings = false;
-                if (this.settings.sheetId) {
-                    this.loadTasks();
-                }
-            },
-            loadSettings() {
-                const savedSettings = localStorage.getItem('tasksAppSettings');
-                if (savedSettings) {
-                    this.settings = JSON.parse(savedSettings);
-                    if(this.settings.sheetId){
-                       this.loadTasks();
-                    }
-                }
-            },
-            async loadCalendars() {
-                try {
-                    const response = await gapi.client.calendar.calendarList.list();
-                    this.calendars = response.result.items;
-                } catch (err) {
-                    console.error('Error fetching calendar list:', err);
-                    this.error = 'Failed to fetch calendar list. Check permissions.';
                 }
             },
             async loadTasks() {
-                if (!this.settings.sheetId) {
-                    this.error = "Google Sheet ID is not set. Please configure in settings.";
-                    return;
-                }
-                this.loading = true;
+                this.isLoading = true;
                 this.error = null;
                 try {
                     const response = await gapi.client.sheets.spreadsheets.values.get({
-                        spreadsheetId: this.settings.sheetId,
-                        range: 'Tasks!A:Z', 
+                        spreadsheetId: this.config.sheetId,
+                        range: 'Tasks!A:Z',
                     });
                     const rows = response.result.values;
-                    if (!rows || rows.length < 2) {
-                        this.tasks = [];
-                        this.loading = false;
-                        return;
-                    }
-                    const headers = rows[0];
-                    const tasksData = rows.slice(1).map(row => {
-                        let task = {};
-                        headers.forEach((header, i) => {
-                            task[header] = row[i] || null;
+                    if (rows && rows.length > 1) {
+                        this.headers = rows[0];
+                        const tasksData = rows.slice(1).map((row, index) => {
+                            let task = { _row: index + 2 };
+                            this.headers.forEach((header, i) => {
+                                task[header] = row[i] || '';
+                            });
+                            return task;
                         });
-                        return task;
-                    });
-                    this.tasks = tasksData;
+                        this.tasks = tasksData;
+                    } else {
+                        this.tasks = [];
+                        this.headers = rows ? rows[0] : [];
+                    }
                 } catch (err) {
-                    console.error("Error loading tasks:", err);
-                    this.error = `Failed to load tasks. Check Sheet ID and permissions. Details: ${err.result?.error?.message || err.message}`;
+                    this.error = `Error loading tasks: ${err.result?.error?.message || err.message}. Check Sheet ID and permissions.`;
+                    console.error("Error loading tasks", err);
                 } finally {
-                    this.loading = false;
+                    this.isLoading = false;
                 }
             },
             openTaskModal(task) {
-                if (task) {
+                if(task){
                     this.editingTask = task;
-                    this.currentTask = { ...task };
+                    this.currentTask = {...task};
                 } else {
                     this.editingTask = null;
-                    this.currentTask = {
-                        Subject: '',
-                        Priority: 'Medium',
-                        Category: 'Tasks',
-                        IsItCompleted: false
-                    };
+                    this.currentTask = {};
                 }
                 this.showTaskModal = true;
             },
-            async saveTask() {
-                console.log("Saving task:", this.currentTask);
-                this.showNotification("Task saving is not fully implemented in this demo.", "error");
+            closeTaskModal() { this.showTaskModal = false; },
+            saveTask() {
+                alert("Save task functionality is not fully implemented yet.");
+                this.closeTaskModal();
             },
-            deleteTask() {
-                 this.requestConfirmation({
-                    title: 'Delete Task',
-                    message: 'Are you sure you want to delete this task? This action cannot be undone.',
-                    onConfirm: () => {
-                        console.log("Deleting task:", this.editingTask);
-                        this.showNotification("Task deletion is not fully implemented in this demo.", "error");
-                        this.showTaskModal = false;
-                    }
-                 });
-            },
-            async toggleComplete(task) {
-                 task.IsItCompleted = task.IsItCompleted === 'TRUE' ? 'FALSE' : 'TRUE';
-                 console.log("Toggling complete status for:", task);
-                 this.showNotification("Task completion is not fully implemented in this demo.", "error");
-            },
-            showNotification(message, type = 'success', duration = 3000) {
-                this.notification.message = message;
-                this.notification.type = type;
-                this.notification.show = true;
-                this.$nextTick(() => {
-                    const el = document.querySelector('.notification');
-                    if (el) {
-                        setTimeout(() => {
-                           el.style.transform = 'translateY(0)';
-                           el.style.opacity = '1';
-                        }, 10);
-                    }
-                });
-                setTimeout(() => {
-                    const el = document.querySelector('.notification');
-                    if (el) {
-                        el.style.transform = 'translateY(100px)';
-                        el.style.opacity = '0';
-                        setTimeout(() => {
-                           this.notification.show = false;
-                        }, 500);
-                    } else {
-                       this.notification.show = false;
-                    }
-                }, duration);
-            },
-            requestConfirmation({ title, message, onConfirm }) {
-                this.confirmDialog.title = title;
-                this.confirmDialog.message = message;
-                this.confirmDialog.onConfirm = onConfirm;
-                this.confirmDialog.show = true;
-            },
-            executeConfirmation() {
-                if (this.confirmDialog.onConfirm) {
-                    this.confirmDialog.onConfirm();
+            toggleComplete(task) {
+                const newStatus = task['Is it Completed'] !== 'TRUE';
+                const completedColIndex = this.headers.indexOf('Is it Completed');
+                if(completedColIndex === -1) {
+                    this.error = "Could not find 'Is it Completed' column.";
+                    return;
                 }
-                this.cancelConfirmation();
-            },
-            cancelConfirmation() {
-                this.confirmDialog.show = false;
-                this.confirmDialog.title = '';
-                this.confirmDialog.message = '';
-                this.confirmDialog.onConfirm = null;
+                const range = `Tasks!${String.fromCharCode(65 + completedColIndex)}${task._row}`;
+                gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: this.config.sheetId,
+                    range: range,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [[newStatus ? 'TRUE' : 'FALSE']] }
+                }).then(() => {
+                    task['Is it Completed'] = newStatus ? 'TRUE' : 'FALSE';
+                }).catch(err => {
+                    this.error = "Could not update task status.";
+                    console.error("Error updating task", err);
+                });
             },
             getPriorityClass(priority) {
                 return {
@@ -422,40 +328,35 @@
                 }[priority] || 'bg-gray-100 text-gray-800';
             },
             formatTaskDate(task) {
-                if (!task.StartDate) return 'No date';
-                let dateStr = task.StartDate;
-                if (task.StartTime) {
-                    dateStr += ` at ${task.StartTime}`;
+                if (!task['Start Date']) return 'No date';
+                let dateStr = task['Start Date'];
+                if (task['Start Time']) {
+                    dateStr += ` at ${task['Start Time']}`;
                 }
                 return dateStr;
+            },
+            openSettings() {
+                // Simplified for now, can be expanded to a full modal
+                const sheetId = prompt("Enter your Google Sheet ID:", this.config.sheetId);
+                if(sheetId){
+                    this.config.sheetId = sheetId;
+                    localStorage.setItem('tasksAppConfig', JSON.stringify(this.config));
+                    this.loadTasks();
+                }
             }
         },
         mounted() {
-            // Check for config file first
-            if (typeof CLIENT_ID === 'undefined' || typeof API_KEY === 'undefined') {
-                 this.setupError = 'Configuration file (config.js) not found or is missing keys. Please create it from config.example.js and add your credentials.';
-                 return;
-            }
-            if (CLIENT_ID.startsWith('YOUR_CLIENT_ID') || API_KEY.startsWith('YOUR_API_KEY')) {
-                this.setupError = 'API Credentials not configured. Please replace the placeholder values for CLIENT_ID and API_KEY in config.js with your own credentials from the Google Cloud Console.';
-                return;
-            }
             const gapiScript = document.createElement('script');
             gapiScript.src = 'https://apis.google.com/js/api.js';
-            gapiScript.onload = this.gapiLoaded;
-            gapiScript.async = true;
-            gapiScript.defer = true;
+            gapiScript.onload = this.loadConfig;
             document.head.appendChild(gapiScript);
             const gisScript = document.createElement('script');
             gisScript.src = 'https://accounts.google.com/gsi/client';
-            gisScript.onload = this.gisLoaded;
-            gisScript.async = true;
-            gisScript.defer = true;
             document.head.appendChild(gisScript);
         }
     });
-
     app.mount('#app');
-    </script>
+</script>
 </body>
 </html>
+
