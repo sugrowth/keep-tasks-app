@@ -10,10 +10,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         [v-cloak] { display: none; }
-        .task-item:hover .task-actions { opacity: 1; }
-        .task-actions { opacity: 0; transition: opacity 0.2s ease-in-out; }
         .modal-bg { background-color: rgba(0,0,0,0.5); }
-        .notification { transition: opacity 0.5s, transform 0.5s; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -30,38 +27,19 @@
                     </svg>
                     <h1 class="text-xl font-semibold ml-3 text-gray-800">My Tasks</h1>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button @click="openSettings" class="p-2 rounded-full hover:bg-gray-200 focus:outline-none">
-                        <svg class="h-6 w-6 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                    </button>
-                    <button v-if="!isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none transition duration-150">
-                        Connect Google Account
-                    </button>
-                    <button v-else @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 focus:outline-none transition duration-150">
-                        Sign Out
-                    </button>
-                </div>
             </div>
         </div>
     </header>
 
     <!-- Main Content -->
     <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
-        <!-- Configuration Modal -->
-        <div v-if="showConfigModal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 p-4">
-            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-                <h2 class="text-2xl font-bold mb-4">Initial Setup</h2>
-                <p class="mb-4 text-gray-600">Please provide your credentials and Sheet ID. This is stored securely in your browser.</p>
-                <div class="space-y-4">
-                    <input v-model="config.apiKey" placeholder="Your API Key" class="w-full p-3 border rounded-lg" type="password">
-                    <input v-model="config.clientId" placeholder="Your Client ID" class="w-full p-3 border rounded-lg" type="password">
-                    <input v-model="config.sheetId" placeholder="Your Google Sheet ID" class="w-full p-3 border rounded-lg">
-                </div>
-                <div class="mt-6 flex justify-end">
-                    <button @click="saveConfigAndInit" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg">Save & Initialize</button>
-                </div>
+        <!-- Configuration Input -->
+        <div v-if="!isConfigured" class="bg-white p-6 rounded-lg shadow-md max-w-xl mx-auto">
+            <h2 class="text-2xl font-bold mb-4">Welcome!</h2>
+            <p class="mb-4 text-gray-600">Please deploy your Google Apps Script as a Web App and paste the URL below to connect this application to your Google Sheet.</p>
+            <div class="flex items-center space-x-2">
+                <input v-model="scriptUrl" placeholder="Paste your Web App URL here" class="w-full p-3 border rounded-lg">
+                <button @click="saveScriptUrl" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg">Connect</button>
             </div>
         </div>
 
@@ -76,7 +54,7 @@
         </div>
 
         <!-- Task Management Area -->
-        <div v-if="isConfigured && !isLoading && isSignedIn && !error">
+        <div v-if="isConfigured && !isLoading && !error">
             <div class="mb-6">
                 <button @click="openTaskModal(null)" class="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg shadow-sm flex items-center justify-center space-x-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
@@ -85,41 +63,20 @@
             </div>
             <div class="bg-white p-4 rounded-lg shadow-md">
                  <h2 class="text-2xl font-bold mb-4 text-gray-800">Tasks</h2>
-                 <div v-if="activeTasks.length === 0" class="text-center py-10 text-gray-500">
-                    <p>No active tasks. Well done!</p>
+                 <div v-if="tasks.length === 0" class="text-center py-10 text-gray-500">
+                    <p>No tasks found. Add one to get started!</p>
                  </div>
                  <ul v-else class="space-y-3">
-                    <li v-for="task in activeTasks" :key="task._TaskID" @click="openTaskModal(task)" class="p-4 border rounded-lg hover:shadow-md hover:border-yellow-500 cursor-pointer transition-shadow duration-150 bg-gray-50 flex items-start justify-between">
+                    <li v-for="task in tasks" :key="task._TaskID" @click="openTaskModal(task)" class="p-4 border rounded-lg hover:shadow-md hover:border-yellow-500 cursor-pointer transition-shadow duration-150 bg-gray-50 flex items-start justify-between">
                         <div class="flex items-start">
-                            <input type="checkbox" :checked="task['Is it Completed'] === 'TRUE'" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
+                            <input type="checkbox" :checked="task['Is it Completed'] === true" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
                             <div class="ml-4">
-                                <p class="font-semibold text-lg text-gray-900">{{ task.Subject }}</p>
+                                <p class="font-semibold text-lg text-gray-900" :class="{ 'line-through text-gray-500': task['Is it Completed'] === true }">{{ task.Subject }}</p>
                                 <p class="text-sm text-gray-600">{{ formatTaskDate(task) }}</p>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{{ task.Category }}</span>
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full" :class="getPriorityClass(task.Priority)">{{ task.Priority }}</span>
-                                </div>
                             </div>
                         </div>
                     </li>
                  </ul>
-            </div>
-            <div class="mt-8" v-if="completedTasks.length > 0">
-                <h2 @click="showCompleted = !showCompleted" class="text-xl font-semibold text-gray-600 mb-2 cursor-pointer flex items-center">
-                    Completed
-                    <svg :class="{ 'rotate-180': !showCompleted }" class="h-5 w-5 ml-2 transform transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                </h2>
-                <div v-show="showCompleted" class="bg-white rounded-lg shadow-md p-4">
-                    <ul class="space-y-3">
-                        <li v-for="task in completedTasks" :key="task._TaskID" class="p-4 border rounded-lg bg-gray-50 flex items-start">
-                             <input type="checkbox" :checked="task['Is it Completed'] === 'TRUE'" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
-                            <div class="ml-4">
-                                <p class="font-semibold text-gray-500 line-through">{{ task.Subject }}</p>
-                                <p class="text-sm text-gray-400">{{ formatTaskDate(task) }}</p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
             </div>
         </div>
     </main>
@@ -127,7 +84,7 @@
     <!-- Footer -->
     <footer class="bg-white mt-8 py-4 border-t">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-            Keep-like Tasks App | Securely syncing with Google Sheets & Calendar
+            Keep-like Tasks App | Powered by Google Apps Script
         </div>
     </footer>
 
@@ -142,26 +99,20 @@
                         <input type="date" v-model="currentTask['Start Date']" class="w-full p-3 border border-gray-300 rounded-lg" required>
                         <input type="time" v-model="currentTask['Start Time']" class="w-full p-3 border border-gray-300 rounded-lg">
                     </div>
-                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <select v-model="currentTask.Priority" class="w-full p-3 border border-gray-300 rounded-lg">
-                            <option>Low</option>
-                            <option>Medium</option>
-                            <option>High</option>
-                            <option>Urgent</option>
-                        </select>
-                        <select v-model="currentTask.Category" class="w-full p-3 border border-gray-300 rounded-lg">
-                            <option>Tasks</option>
-                            <option>Chores</option>
-                            <option>Important Dates</option>
-                            <option>Deadlines</option>
-                            <option>Meetings</option>
-                        </select>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="date" v-model="currentTask['End Date']" class="w-full p-3 border border-gray-300 rounded-lg">
+                        <input type="time" v-model="currentTask['End Time']" class="w-full p-3 border border-gray-300 rounded-lg">
                     </div>
                     <textarea placeholder="Notes" v-model="currentTask.Notes" class="w-full p-3 border border-gray-300 rounded-lg" rows="3"></textarea>
                 </div>
-                <div class="flex justify-end mt-6 space-x-3">
-                    <button type="button" @click="closeTaskModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Save Task</button>
+                <div class="flex justify-between items-center mt-6">
+                    <div>
+                        <button v-if="editingTask" type="button" @click="deleteTask" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Delete</button>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button type="button" @click="closeTaskModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Save Task</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -171,137 +122,51 @@
 <script>
     const { createApp } = Vue;
 
-    const DISCOVERY_DOCS = [
-        "https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest",
-        "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"
-    ];
-    const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar';
-
     const app = createApp({
         data() {
             return {
-                config: { apiKey: '', clientId: '', sheetId: '' },
-                showConfigModal: false,
+                scriptUrl: '',
                 isConfigured: false,
-                isLoading: true,
-                isSignedIn: false,
+                isLoading: false,
+                error: null,
                 tasks: [],
-                headers: [],
-                tokenClient: null,
-                showCompleted: false,
                 showTaskModal: false,
                 editingTask: null,
                 currentTask: {},
-                error: null,
-            }
-        },
-        computed: {
-            activeTasks() {
-                return this.tasks.filter(t => t['Is it Completed'] !== 'TRUE');
-            },
-            completedTasks() {
-                return this.tasks.filter(t => t['Is it Completed'] === 'TRUE');
             }
         },
         methods: {
             loadConfig() {
-                const savedConfig = localStorage.getItem('tasksAppConfig');
-                if (savedConfig) {
-                    this.config = JSON.parse(savedConfig);
-                    if (this.config.apiKey && this.config.clientId && this.config.sheetId) {
-                        this.isConfigured = true;
-                        this.gapiLoaded();
-                    } else { this.showConfigModal = true; this.isLoading = false; }
-                } else { this.showConfigModal = true; this.isLoading = false; }
+                const savedUrl = localStorage.getItem('tasksAppScriptUrl');
+                if (savedUrl) {
+                    this.scriptUrl = savedUrl;
+                    this.isConfigured = true;
+                    this.fetchTasks();
+                }
             },
-            saveConfigAndInit() {
-                if (!this.config.apiKey || !this.config.clientId || !this.config.sheetId) {
-                    alert("All three fields are required.");
+            saveScriptUrl() {
+                if (!this.scriptUrl || !this.scriptUrl.startsWith('https://script.google.com/')) {
+                    this.error = "Please enter a valid Google Apps Script Web App URL.";
                     return;
                 }
-                localStorage.setItem('tasksAppConfig', JSON.stringify(this.config));
-                alert("Settings Saved! The page will now reload.");
-                location.reload(); 
-            },
-            gapiLoaded() { gapi.load('client', this.initializeGapiClient); },
-            async initializeGapiClient() {
-                try {
-                    await gapi.client.init({
-                        apiKey: this.config.apiKey,
-                        discoveryDocs: DISCOVERY_DOCS,
-                    });
-                    this.gisLoaded();
-                } catch (error) {
-                    this.error = "Failed to initialize Google Client. Please check your API Key.";
-                    console.error("Error initializing GAPI client", error);
-                    localStorage.removeItem('tasksAppConfig');
-                    this.isLoading = false;
-                }
-            },
-            gisLoaded() {
-                this.tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: this.config.clientId,
-                    scope: SCOPES,
-                    callback: (tokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) { this.handleSignIn(tokenResponse); } 
-                        else if (tokenResponse && tokenResponse.error) {
-                            this.error = `Google Sign-In failed: ${tokenResponse.error_description || 'Unknown error'}`;
-                            console.error("OAuth Error:", tokenResponse.error);
-                            this.isLoading = false;
-                        }
-                    },
-                });
-                this.isLoading = false;
-            },
-            handleSignIn() {
-                this.isSignedIn = true;
-                this.loadTasks();
-            },
-            handleAuthClick() {
-                this.isLoading = true;
+                localStorage.setItem('tasksAppScriptUrl', this.scriptUrl);
+                this.isConfigured = true;
                 this.error = null;
-                if (gapi.client.getToken() === null) {
-                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
-                } else {
-                    this.tokenClient.requestAccessToken({ prompt: '' });
-                }
+                this.fetchTasks();
             },
-            handleSignoutClick() {
-                const token = gapi.client.getToken();
-                if (token !== null) {
-                    google.accounts.oauth2.revoke(token.access_token, () => {
-                        gapi.client.setToken('');
-                        this.isSignedIn = false;
-                        this.tasks = [];
-                    });
-                }
-            },
-            async loadTasks() {
+            async fetchTasks() {
                 this.isLoading = true;
                 this.error = null;
                 try {
-                    const response = await gapi.client.sheets.spreadsheets.values.get({
-                        spreadsheetId: this.config.sheetId,
-                        range: 'Tasks!A:Z',
-                    });
-                    const rows = response.result.values;
-                    if (rows && rows.length > 1) {
-                        this.headers = rows[0];
-                        const tasksData = rows.slice(1).map((row, index) => {
-                            let task = { _row: index + 2 };
-                            this.headers.forEach((header, i) => {
-                                task[header] = row[i] || '';
-                            });
-                            return task;
-                        });
-                        this.tasks = tasksData;
+                    const response = await fetch(`${this.scriptUrl}?action=getTasks`);
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        this.tasks = result.data;
                     } else {
-                        this.tasks = [];
-                        this.headers = rows ? rows[0] : [];
+                        throw new Error(result.message);
                     }
                 } catch (err) {
-                    this.error = `Error loading tasks: ${err.result?.error?.message || err.message}. Check Sheet ID and permissions.`;
-                    console.error("Error loading tasks", err);
+                    this.error = `Failed to load tasks: ${err.message}. Please check your script URL and deployment permissions.`;
                 } finally {
                     this.isLoading = false;
                 }
@@ -309,14 +174,14 @@
             openTaskModal(task) {
                 if(task){
                     this.editingTask = task;
-                    this.currentTask = {...task};
+                    // Create a deep copy for editing
+                    this.currentTask = JSON.parse(JSON.stringify(task));
                 } else {
                     this.editingTask = null;
                     this.currentTask = { 
                         Subject: '', 
                         'Start Date': new Date().toISOString().split('T')[0],
-                        Priority: 'Medium',
-                        Category: 'Tasks'
+                        'Is it Completed': false,
                     };
                 }
                 this.showTaskModal = true;
@@ -324,93 +189,95 @@
             closeTaskModal() { this.showTaskModal = false; },
             async saveTask() {
                 this.isLoading = true;
-                // Convert currentTask object to an array in the correct order of headers
-                const userHeaders = this.headers.filter(h => !h.startsWith('_'));
-                const rowData = userHeaders.map(header => this.currentTask[header] || '');
-
+                this.closeTaskModal();
+                const action = this.editingTask ? 'updateTask' : 'createTask';
                 try {
-                    if (this.editingTask) {
-                        // Update existing task
-                        const range = `Tasks!A${this.editingTask._row}:${String.fromCharCode(65 + userHeaders.length - 1)}${this.editingTask._row}`;
-                        await gapi.client.sheets.spreadsheets.values.update({
-                            spreadsheetId: this.config.sheetId,
-                            range: range,
-                            valueInputOption: 'USER_ENTERED',
-                            resource: { values: [rowData] }
-                        });
-                    } else {
-                        // Create new task
-                        await gapi.client.sheets.spreadsheets.values.append({
-                            spreadsheetId: this.config.sheetId,
-                            range: 'Tasks!A:A',
-                            valueInputOption: 'USER_ENTERED',
-                            resource: { values: [rowData] }
-                        });
+                    const response = await fetch(this.scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: action, payload: this.currentTask }),
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    const result = await response.json();
+                    if (result.status !== 'success') {
+                        throw new Error(result.message);
                     }
-                    await this.loadTasks(); // Reload all tasks to see the change
+                    await this.fetchTasks(); // Refresh the list
                 } catch (err) {
-                    this.error = `Error saving task: ${err.result?.error?.message || err.message}`;
-                    console.error("Error saving task", err);
+                    this.error = `Failed to save task: ${err.message}`;
                 } finally {
                     this.isLoading = false;
-                    this.closeTaskModal();
                 }
             },
-            toggleComplete(task) {
-                const newStatus = task['Is it Completed'] !== 'TRUE';
-                const completedColIndex = this.headers.indexOf('Is it Completed');
-                if(completedColIndex === -1) {
-                    this.error = "Could not find 'Is it Completed' column.";
+            async toggleComplete(task) {
+                 // Create a copy to modify
+                const updatedTask = JSON.parse(JSON.stringify(task));
+                updatedTask['Is it Completed'] = !updatedTask['Is it Completed'];
+                this.isLoading = true;
+                try {
+                     const response = await fetch(this.scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'updateTask', payload: updatedTask }),
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    const result = await response.json();
+                     if (result.status !== 'success') {
+                        throw new Error(result.message);
+                    }
+                    // Update local task instead of full refetch for speed
+                    const taskIndex = this.tasks.findIndex(t => t.rowIndex === task.rowIndex);
+                    if (taskIndex !== -1) {
+                        this.tasks[taskIndex]['Is it Completed'] = updatedTask['Is it Completed'];
+                    }
+                } catch (err) {
+                     this.error = `Failed to update task status: ${err.message}`;
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+             async deleteTask() {
+                if (!this.editingTask || !confirm(`Are you sure you want to delete "${this.editingTask.Subject}"?`)) {
                     return;
                 }
-                const range = `Tasks!${String.fromCharCode(65 + completedColIndex)}${task._row}`;
-                gapi.client.sheets.spreadsheets.values.update({
-                    spreadsheetId: this.config.sheetId,
-                    range: range,
-                    valueInputOption: 'USER_ENTERED',
-                    resource: { values: [[newStatus ? 'TRUE' : 'FALSE']] }
-                }).then(() => {
-                    task['Is it Completed'] = newStatus ? 'TRUE' : 'FALSE';
-                }).catch(err => {
-                    this.error = "Could not update task status.";
-                    console.error("Error updating task", err);
-                });
-            },
-            getPriorityClass(priority) {
-                return {
-                    'Urgent': 'bg-red-100 text-red-800',
-                    'High': 'bg-orange-100 text-orange-800',
-                    'Medium': 'bg-yellow-100 text-yellow-800',
-                    'Low': 'bg-green-100 text-green-800',
-                }[priority] || 'bg-gray-100 text-gray-800';
+                 this.isLoading = true;
+                this.closeTaskModal();
+                 try {
+                     const response = await fetch(this.scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'deleteTask', payload: { rowIndex: this.editingTask.rowIndex } }),
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    const result = await response.json();
+                     if (result.status !== 'success') {
+                        throw new Error(result.message);
+                    }
+                    await this.fetchTasks();
+                } catch (err) {
+                     this.error = `Failed to delete task: ${err.message}`;
+                } finally {
+                    this.isLoading = false;
+                }
             },
             formatTaskDate(task) {
                 if (!task['Start Date']) return 'No date';
-                let dateStr = task['Start Date'];
-                if (task['Start Time']) {
-                    dateStr += ` at ${task['Start Time']}`;
-                }
-                return dateStr;
-            },
-            openSettings() {
-                const sheetId = prompt("Enter your Google Sheet ID:", this.config.sheetId || '');
-                if (sheetId && sheetId !== this.config.sheetId) {
-                    this.config.sheetId = sheetId;
-                    localStorage.setItem('tasksAppConfig', JSON.stringify(this.config));
-                    this.loadTasks();
+                try {
+                    let date = new Date(task['Start Date']);
+                    let options = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' };
+                    let dateStr = date.toLocaleDateString(undefined, options);
+                    
+                    if (task['Start Time']) {
+                        dateStr += ` at ${task['Start Time']}`;
+                    }
+                    return dateStr;
+                } catch (e) {
+                    return task['Start Date']; // Fallback for invalid date
                 }
             }
         },
         mounted() {
-            const gapiScript = document.createElement('script');
-            gapiScript.src = 'https://apis.google.com/js/api.js';
-            gapiScript.onload = this.loadConfig;
-            document.head.appendChild(gapiScript);
-            const gisScript = document.createElement('script');
-            gisScript.src = 'https://accounts.google.com/gsi/client';
-            document.head.appendChild(gisScript);
+            this.loadConfig();
         }
     });
+
     app.mount('#app');
 </script>
 </body>
