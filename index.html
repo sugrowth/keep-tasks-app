@@ -25,7 +25,7 @@
                     <h1 class="text-xl font-semibold ml-3 text-gray-800">My Tasks (Secure)</h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <button v-if="isConfigured && !isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600">Sign in with Google</button>
+                    <button v-if="isConfigured && !isSignedIn" @click="handleAuthClick" :disabled="!authReady" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600 disabled:bg-gray-400 disabled:cursor-not-allowed">Sign in with Google</button>
                     <button v-if="isSignedIn" @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Sign Out</button>
                 </div>
             </div>
@@ -70,8 +70,14 @@
         data() { return {
             config: { clientId: '', scriptId: '' },
             isConfigured: false, isLoading: true, error: null,
-            tasks: [], isSignedIn: false, tokenClient: null, gisReady: false,
+            tasks: [], isSignedIn: false, tokenClient: null,
+            gisReady: false, gapiReady: false,
         }},
+        computed: {
+            authReady() {
+                return this.gisReady && this.gapiReady && this.tokenClient;
+            }
+        },
         methods: {
             loadConfig() {
                 const savedConfig = localStorage.getItem('tasksAppSecureConfig');
@@ -85,28 +91,32 @@
                 if (!this.config.clientId || !this.config.scriptId) { alert("Both fields are required."); return; }
                 localStorage.setItem('tasksAppSecureConfig', JSON.stringify(this.config));
                 this.isConfigured = true;
+                window.location.reload(); // Reload to initialize clients with new config
             },
-            gapiLoaded() { gapi.load('client', this.initializeGapiClient); },
-            gisScriptLoaded() { this.gisReady = true; },
-            async initializeGapiClient() {
-                await gapi.client.init({});
-                const interval = setInterval(() => {
-                    if (this.gisReady) { clearInterval(interval); this.gisLoaded(); }
-                }, 100);
-            },
-            gisLoaded() {
-                this.tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: this.config.clientId, scope: SCOPES,
-                    callback: (tokenResponse) => {
-                        if (tokenResponse && tokenResponse.access_token) {
-                            this.isSignedIn = true; this.fetchTasks();
-                        } else { this.error = "Sign-in failed. Please try again."; }
-                    },
+            gapiLoaded() { 
+                gapi.load('client', () => {
+                    gapi.client.init({}).then(() => {
+                        this.gapiReady = true;
+                        this.initializeGisClient();
+                    });
                 });
             },
+            gisLoaded() { this.gisReady = true; this.initializeGisClient(); },
+            initializeGisClient() {
+                if(this.gapiReady && this.gisReady && this.isConfigured && !this.tokenClient) {
+                    this.tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: this.config.clientId, scope: SCOPES,
+                        callback: (tokenResponse) => {
+                            if (tokenResponse && tokenResponse.access_token) {
+                                this.isSignedIn = true; this.fetchTasks();
+                            } else { this.error = "Sign-in failed. Please try again."; }
+                        },
+                    });
+                }
+            },
             handleAuthClick() {
-                if (this.tokenClient) this.tokenClient.requestAccessToken({ prompt: 'consent' });
-                else this.error = "Authentication is not ready. Please wait a moment.";
+                if (this.authReady) this.tokenClient.requestAccessToken({ prompt: 'consent' });
+                else this.error = "Authentication is not ready. Please wait a moment and try again.";
             },
             handleSignoutClick() {
                 const token = gapi.client.getToken();
@@ -135,7 +145,7 @@
             document.head.appendChild(gapiScript);
             const gisScript = document.createElement('script');
             gisScript.src = 'https://accounts.google.com/gsi/client';
-            gisScript.onload = this.gisScriptLoaded;
+            gisScript.onload = this.gisLoaded;
             document.head.appendChild(gisScript);
         }
     });
