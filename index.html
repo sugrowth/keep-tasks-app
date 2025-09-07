@@ -136,7 +136,29 @@
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 max-h-screen overflow-y-auto" @click.away="closeTaskModal">
             <h2 class="text-2xl font-bold mb-4">{{ editingTask ? 'Edit Task' : 'Add New Task' }}</h2>
             <form @submit.prevent="saveTask">
-                <!-- Form fields will go here -->
+                <div class="space-y-4">
+                    <input type="text" placeholder="Subject" v-model="currentTask.Subject" class="w-full p-3 border border-gray-300 rounded-lg" required>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="date" v-model="currentTask['Start Date']" class="w-full p-3 border border-gray-300 rounded-lg" required>
+                        <input type="time" v-model="currentTask['Start Time']" class="w-full p-3 border border-gray-300 rounded-lg">
+                    </div>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <select v-model="currentTask.Priority" class="w-full p-3 border border-gray-300 rounded-lg">
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                        </select>
+                        <select v-model="currentTask.Category" class="w-full p-3 border border-gray-300 rounded-lg">
+                            <option>Tasks</option>
+                            <option>Chores</option>
+                            <option>Important Dates</option>
+                            <option>Deadlines</option>
+                            <option>Meetings</option>
+                        </select>
+                    </div>
+                    <textarea placeholder="Notes" v-model="currentTask.Notes" class="w-full p-3 border border-gray-300 rounded-lg" rows="3"></textarea>
+                </div>
                 <div class="flex justify-end mt-6 space-x-3">
                     <button type="button" @click="closeTaskModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
                     <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Save Task</button>
@@ -147,7 +169,6 @@
 </div>
 
 <script>
-    // Vue.js code from the previous complete version
     const { createApp } = Vue;
 
     const DISCOVERY_DOCS = [
@@ -291,14 +312,49 @@
                     this.currentTask = {...task};
                 } else {
                     this.editingTask = null;
-                    this.currentTask = {};
+                    this.currentTask = { 
+                        Subject: '', 
+                        'Start Date': new Date().toISOString().split('T')[0],
+                        Priority: 'Medium',
+                        Category: 'Tasks'
+                    };
                 }
                 this.showTaskModal = true;
             },
             closeTaskModal() { this.showTaskModal = false; },
-            saveTask() {
-                alert("Save task functionality is not fully implemented yet.");
-                this.closeTaskModal();
+            async saveTask() {
+                this.isLoading = true;
+                // Convert currentTask object to an array in the correct order of headers
+                const userHeaders = this.headers.filter(h => !h.startsWith('_'));
+                const rowData = userHeaders.map(header => this.currentTask[header] || '');
+
+                try {
+                    if (this.editingTask) {
+                        // Update existing task
+                        const range = `Tasks!A${this.editingTask._row}:${String.fromCharCode(65 + userHeaders.length - 1)}${this.editingTask._row}`;
+                        await gapi.client.sheets.spreadsheets.values.update({
+                            spreadsheetId: this.config.sheetId,
+                            range: range,
+                            valueInputOption: 'USER_ENTERED',
+                            resource: { values: [rowData] }
+                        });
+                    } else {
+                        // Create new task
+                        await gapi.client.sheets.spreadsheets.values.append({
+                            spreadsheetId: this.config.sheetId,
+                            range: 'Tasks!A:A',
+                            valueInputOption: 'USER_ENTERED',
+                            resource: { values: [rowData] }
+                        });
+                    }
+                    await this.loadTasks(); // Reload all tasks to see the change
+                } catch (err) {
+                    this.error = `Error saving task: ${err.result?.error?.message || err.message}`;
+                    console.error("Error saving task", err);
+                } finally {
+                    this.isLoading = false;
+                    this.closeTaskModal();
+                }
             },
             toggleComplete(task) {
                 const newStatus = task['Is it Completed'] !== 'TRUE';
@@ -337,9 +393,8 @@
                 return dateStr;
             },
             openSettings() {
-                // Simplified for now, can be expanded to a full modal
-                const sheetId = prompt("Enter your Google Sheet ID:", this.config.sheetId);
-                if(sheetId){
+                const sheetId = prompt("Enter your Google Sheet ID:", this.config.sheetId || '');
+                if (sheetId && sheetId !== this.config.sheetId) {
                     this.config.sheetId = sheetId;
                     localStorage.setItem('tasksAppConfig', JSON.stringify(this.config));
                     this.loadTasks();
