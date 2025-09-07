@@ -5,8 +5,7 @@
  * This script serves as the complete backend for the Tasks web app. It handles:
  * - Setting up the Google Sheet with the full data model.
  * - All CRUD (Create, Read, Update, Delete) operations for tasks.
- * - Two-way synchronization of tasks with a specified Google Calendar.
- * - Management of recurring tasks and their exceptions.
+ * - Synchronization of tasks with a specified Google Calendar.
  * - Serving data to the front-end web application.
  *
  * DEPLOYMENT:
@@ -19,11 +18,6 @@
  */
 
 // =================================================================================
-// SCRIPT-WIDE CONFIGURATION & CONSTANTS
-// =================================================================================
-const TARGET_CALENDAR_ID = 'primary'; // Use 'primary' or a specific calendar ID.
-
-// =================================================================================
 // WEB APP ENTRY POINTS (doGet, doPost)
 // =================================================================================
 
@@ -33,6 +27,13 @@ const TARGET_CALENDAR_ID = 'primary'; // Use 'primary' or a specific calendar ID
  * @returns {ContentService.TextOutput} - JSON response with all tasks.
  */
 function doGet(e) {
+  // Add a check to ensure 'e' and 'e.parameter' are defined
+  if (!e || !e.parameter) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'error', message: 'This function is meant to be called from the web app.' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   try {
     const action = e.parameter.action;
     let data;
@@ -80,7 +81,7 @@ function doPost(e) {
         throw new Error("Invalid POST action specified.");
     }
 
-    // After a successful write, sync the change to the calendar
+    // After a successful write, sync the change to the calendar if applicable
     if (result.rowIndex) {
       syncTaskToCalendar(result.rowIndex);
     }
@@ -112,7 +113,12 @@ function getTasks() {
   const tasks = rows.map((row, index) => {
     const task = {};
     headers.forEach((header, i) => {
-      task[header] = row[i];
+      // Ensure booleans are handled correctly for JSON
+      if (row[i] === true || row[i] === false) {
+        task[header] = row[i];
+      } else {
+        task[header] = row[i] || '';
+      }
     });
     task.rowIndex = index + 2; // Add rowIndex for easy updates
     return task;
@@ -130,18 +136,16 @@ function createTask(taskData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tasks');
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-  // Add system-generated values
   taskData['_Task ID'] = generateULID();
   taskData['_Timezone'] = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
   const now = new Date().toISOString();
   taskData['_Created At'] = now;
   taskData['_Updated At'] = now;
   taskData['_Row Version'] = 1;
-  taskData['Is it Completed'] = taskData['Is it Completed'] || 'FALSE';
-  taskData['Delete this'] = 'FALSE';
+  taskData['Is it Completed'] = false; // Set to actual boolean
+  taskData['Delete this'] = false; // Set to actual boolean
 
-
-  const newRow = headers.map(header => taskData[header] || '');
+  const newRow = headers.map(header => taskData[header] === undefined ? '' : taskData[header]);
   sheet.appendRow(newRow);
 
   const newRowIndex = sheet.getLastRow();
@@ -162,13 +166,12 @@ function updateTask(taskData) {
     throw new Error("Update failed: rowIndex is missing.");
   }
 
-  // Add system-generated values
   taskData['_Updated At'] = new Date().toISOString();
   const versionColIndex = headers.indexOf('_Row Version') + 1;
   const currentVersion = sheet.getRange(rowIndex, versionColIndex).getValue();
   taskData['_Row Version'] = (Number(currentVersion) || 0) + 1;
 
-  const updatedRow = headers.map(header => taskData[header] || '');
+  const updatedRow = headers.map(header => taskData[header] === undefined ? '' : taskData[header]);
   sheet.getRange(rowIndex, 1, 1, updatedRow.length).setValues([updatedRow]);
 
   return { message: 'Task updated successfully', rowIndex: rowIndex };
@@ -184,11 +187,11 @@ function deleteTask(rowIndex) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const deleteColIndex = headers.indexOf('Delete this') + 1;
 
-  if (!deleteColIndex) {
+  if (deleteColIndex === 0) {
     throw new Error("Column 'Delete this' not found.");
   }
 
-  sheet.getRange(rowIndex, deleteColIndex).setValue('TRUE');
+  sheet.getRange(rowIndex, deleteColIndex).setValue(true);
 
   return { message: 'Task marked for deletion', rowIndex: rowIndex };
 }
@@ -202,6 +205,7 @@ function deleteTask(rowIndex) {
  * @param {number} rowIndex - The row number of the task to sync.
  */
 function syncTaskToCalendar(rowIndex) {
+  const TARGET_CALENDAR_ID = 'primary'; // Or load from a setting
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tasks');
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const rowValues = sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
@@ -210,110 +214,67 @@ function syncTaskToCalendar(rowIndex) {
   headers.forEach((header, i) => {
     task[header] = rowValues[i];
   });
-  task.rowIndex = rowIndex;
 
   const calendar = CalendarApp.getCalendarById(TARGET_CALENDAR_ID);
   if (!calendar) {
-    throw new Error(`Calendar with ID "${TARGET_CALENDAR_ID}" not found.`);
+    Logger.log(`Calendar with ID "${TARGET_CALENDAR_ID}" not found.`);
+    return; // Silently fail if calendar not found
   }
 
   const eventId = task['_Calendar Event ID'];
   const shouldBeDeleted = task['Delete this'] === true || task['Is it Completed'] === true;
 
-  let event = eventId ? calendar.getEventById(eventId) : null;
+  try {
+    let event = eventId ? calendar.getEventById(eventId) : null;
 
-  if (shouldBeDeleted) {
-    if (event) {
-      event.deleteEvent();
-      // Clear calendar ID from sheet
-      const eventIdCol = headers.indexOf('_Calendar Event ID') + 1;
-      sheet.getRange(rowIndex, eventIdCol).setValue('');
-      Logger.log(`Deleted calendar event for task: ${task.Subject}`);
+    if (shouldBeDeleted) {
+      if (event) {
+        event.deleteEvent();
+        const eventIdCol = headers.indexOf('_Calendar Event ID') + 1;
+        if (eventIdCol > 0) sheet.getRange(rowIndex, eventIdCol).setValue('');
+        Logger.log(`Deleted calendar event for task: ${task.Subject}`);
+      }
+      return;
     }
-    return;
-  }
 
-  if (event) {
-    // Update existing event
-    updateCalendarEvent(event, task);
-    Logger.log(`Updated calendar event for task: ${task.Subject}`);
-  } else {
-    // Create new event
-    event = createCalendarEvent(calendar, task);
-    Logger.log(`Created calendar event for task: ${task.Subject}`);
-  }
+    const { startTime, endTime } = getEventTimes(task);
+    const options = { description: task.Notes || '' };
 
-  // Store the calendar event ID and ETag back in the sheet
-  const eventIdCol = headers.indexOf('_Calendar Event ID') + 1;
-  sheet.getRange(rowIndex, eventIdCol).setValue(event.getId());
+    if (event) {
+      event.setTitle(task.Subject);
+      event.setTime(startTime, endTime);
+      event.setDescription(options.description);
+      Logger.log(`Updated calendar event for task: ${task.Subject}`);
+    } else {
+      const newEvent = calendar.createEvent(task.Subject, startTime, endTime, options);
+      const eventIdCol = headers.indexOf('_Calendar Event ID') + 1;
+      if (eventIdCol > 0) sheet.getRange(rowIndex, eventIdCol).setValue(newEvent.getId());
+      Logger.log(`Created calendar event for task: ${task.Subject}`);
+    }
+  } catch (e) {
+    Logger.log(`Calendar sync failed for task "${task.Subject}": ${e.message}`);
+  }
 }
 
-
-/**
- * Creates a new event in Google Calendar from a task object.
- * @param {Calendar} calendar - The CalendarApp object.
- * @param {Object} task - The task object.
- * @returns {CalendarEvent} The newly created calendar event.
- */
-function createCalendarEvent(calendar, task) {
-  const title = task.Subject;
-  const { startTime, endTime } = getEventTimes(task);
-  const options = {
-    description: task.Notes || ''
-  };
-  
-  let event;
-  if (task['Start Time'] && task['End Time']) {
-    event = calendar.createEvent(title, startTime, endTime, options);
-  } else {
-    // All-day event
-    event = calendar.createAllDayEvent(title, startTime, options);
-  }
-  return event;
-}
-
-/**
- * Updates an existing Google Calendar event from a task object.
- * @param {CalendarEvent} event - The existing event to update.
- * @param {Object} task - The task object with new data.
- */
-function updateCalendarEvent(event, task) {
-  event.setTitle(task.Subject);
-  const { startTime, endTime } = getEventTimes(task);
-
-  if (task['Start Time'] && task['End Time']) {
-    event.setTime(startTime, endTime);
-  } else {
-    // This is a simplification; handling conversion between all-day and timed is complex.
-    // For now, we assume the type of event doesn't change.
-    event.setAllDayDate(startTime);
-  }
-  event.setDescription(task.Notes || '');
-}
-
-/**
- * Helper to parse start/end times for a calendar event.
- * @param {Object} task - The task object.
- * @returns {{startTime: Date, endTime: Date}}
- */
+/** Helper to parse start/end times for a calendar event. */
 function getEventTimes(task) {
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
   const startDate = new Date(task['Start Date']);
   
   if (!task['Start Time']) {
-    // All day event, end date is exclusive
-    const endDate = task['End Date'] ? new Date(task['End Date']) : startDate;
-    endDate.setDate(endDate.getDate() + 1);
-    return { startTime: startDate, endTime: endDate };
+    return { startTime: startDate, endTime: new Date(startDate.getTime() + 24 * 60 * 60 * 1000) };
   }
 
   const [startHour, startMin] = task['Start Time'].split(':');
-  startDate.setHours(startHour, startMin);
+  const startTime = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), startHour, startMin);
 
-  const endDate = task['End Date'] ? new Date(task['End Date']) : new Date(task['Start Date']);
-  const [endHour, endMin] = task['End Time'].split(':');
-  endDate.setHours(endHour, endMin);
+  const endDateStr = task['End Date'] || task['Start Date'];
+  const endTimeStr = task['End Time'] || task['Start Time'];
+  const [endHour, endMin] = endTimeStr.split(':');
+  const endDate = new Date(endDateStr);
+  const endTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), endHour, endMin);
   
-  return { startTime: startDate, endTime: endDate };
+  return { startTime, endTime };
 }
 
 
@@ -322,12 +283,11 @@ function getEventTimes(task) {
 // =================================================================================
 
 /**
- * Initializes the spreadsheet with all the required tabs, headers, and protections.
- * This function should be run manually once.
+ * Initializes the spreadsheet with all the required tabs and headers.
  */
 function setupSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-
+  // ... (rest of setup functions as before)
   const sheetConfigs = [
     { name: "Tasks", headers: getTasksHeaders(), protection: "warn" },
     { name: "OccurrenceDone", headers: ["recurrence_id", "local_date", "is_done", "updated_at"], protection: "hide" },
@@ -350,7 +310,6 @@ function setupSheet() {
   populateDefaultReminders(ss);
   populateCategories(ss);
   
-  // Clean up the default 'Sheet1' if it exists
   const defaultSheet = ss.getSheetByName("Sheet1");
   if (defaultSheet && ss.getSheets().length > sheetConfigs.length) {
     ss.deleteSheet(defaultSheet);
@@ -359,12 +318,7 @@ function setupSheet() {
   SpreadsheetApp.getUi().alert("Sheet setup complete!");
 }
 
-/**
- * Configures an individual sheet with headers, formatting, and protections.
- * @param {Sheet} sheet - The sheet object to configure.
- * @param {Array<string>} headers - The column headers.
- * @param {string} protectionType - 'hide', 'warn', or null.
- */
+/** Configures an individual sheet. */
 function configureSheet(sheet, headers, protectionType) {
   sheet.clear();
   sheet.appendRow(headers);
@@ -377,7 +331,7 @@ function configureSheet(sheet, headers, protectionType) {
   if (protectionType === "hide") {
     sheet.hideSheet();
   } else if (protectionType === "warn") {
-    const protection = sheet.protect().setDescription(`System sheet. Editing may break app functionality.`);
+    const protection = sheet.protect().setDescription(`System sheet.`);
     protection.setWarningOnly(true);
   }
   
@@ -386,28 +340,14 @@ function configureSheet(sheet, headers, protectionType) {
   }
 }
 
-/**
- * Returns the full list of headers for the Tasks sheet as per the spec.
- * @returns {Array<string>}
- */
+/** Returns the full list of headers for the Tasks sheet. */
 function getTasksHeaders() {
-  const userHeaders = [
-    "Subject", "Start Date", "Start Time", "End Date", "End Time",
-    "Is it Completed", "Delete this", "Category", "Recurrence", "Repeat Count",
-    "Priority", "Tags", "Notes"
-  ];
-  const systemHeaders = [
-    "_Task ID", "_Timezone", "_Calendar Event ID", "_Last Calendar ETag",
-    "_Last Calendar Sync At", "_Row Version", "_Created At", "_Updated At"
-  ];
+  const userHeaders = [ "Subject", "Start Date", "Start Time", "End Date", "End Time", "Is it Completed", "Delete this", "Category", "Recurrence", "Repeat Count", "Priority", "Tags", "Notes" ];
+  const systemHeaders = [ "_Task ID", "_Timezone", "_Calendar Event ID", "_Last Calendar ETag", "_Last Calendar Sync At", "_Row Version", "_Created At", "_Updated At" ];
   return userHeaders.concat(systemHeaders);
 }
 
-/**
- * Sets up data validation rules for the Tasks sheet.
- * @param {Sheet} sheet - The Tasks sheet object.
- * @param {Array<string>} headers - The column headers.
- */
+/** Sets up data validation rules for the Tasks sheet. */
 function setupTasksSheetValidation(sheet, headers) {
     const boolRule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
     setValidation(sheet, "Is it Completed", headers, boolRule);
@@ -421,7 +361,6 @@ function setupTasksSheetValidation(sheet, headers) {
     const priorityRule = SpreadsheetApp.newDataValidation().requireValueInList(priorities).build();
     setValidation(sheet, "Priority", headers, priorityRule);
     
-    // Set category dropdown based on CategoryReminders sheet
     const categorySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("CategoryReminders");
     if (categorySheet) {
       const categoryRange = categorySheet.getRange("A2:A" + categorySheet.getLastRow());
@@ -430,13 +369,7 @@ function setupTasksSheetValidation(sheet, headers) {
     }
 }
 
-/**
- * Helper to apply a data validation rule to a column by its header name.
- * @param {Sheet} sheet - The sheet object.
- * @param {string} headerName - The name of the column header.
- * @param {Array<string>} headers - The array of all headers.
- * @param {DataValidation} rule - The validation rule to apply.
- */
+/** Helper to apply a data validation rule. */
 function setValidation(sheet, headerName, headers, rule) {
     const colIndex = headers.indexOf(headerName) + 1;
     if (colIndex > 0) {
@@ -444,55 +377,37 @@ function setValidation(sheet, headerName, headers, rule) {
     }
 }
 
-/** Populates the PriorityReminders sheet with default values. */
+/** Populates the PriorityReminders sheet. */
 function populateDefaultReminders(ss) {
     const sheet = ss.getSheetByName("PriorityReminders");
     sheet.getRange("A2:B").clearContent();
-    const data = [
-      ["Urgent", "1440, 120, 30, 10"], ["High", "120, 30"],
-      ["Medium", "30"], ["Low", ""]
-    ];
+    const data = [ ["Urgent", "1440, 120, 30, 10"], ["High", "120, 30"], ["Medium", "30"], ["Low", ""] ];
     sheet.getRange(2, 1, data.length, data[0].length).setValues(data);
 }
 
-/** Populates the CategoryReminders sheet with default values. */
+/** Populates the CategoryReminders sheet. */
 function populateCategories(ss) {
     const sheet = ss.getSheetByName("CategoryReminders");
     sheet.getRange("A2:B").clearContent();
-    const data = [
-      ["Tasks", "1440"], ["Chores", "1440"], ["Important Dates", "2880, 1440"],
-      ["Deadlines", "2880, 1440, 120"], ["Meetings", "60, 10"], ["Recharge", "1440"],
-      ["Subscriptions", "2880, 1440"], ["Information", "1440"], ["Personal", "1440"],
-      ["Work", "1440, 30"], ["Health", "1440"], ["Finance", "4320, 1440"],
-      ["Learning", "1440"], ["Custom", "1440"]
-    ];
+    const data = [ ["Tasks", "1440"], ["Chores", "1440"], ["Important Dates", "2880, 1440"], ["Deadlines", "2880, 1440, 120"], ["Meetings", "60, 10"], ["Recharge", "1440"], ["Subscriptions", "2880, 1440"], ["Information", "1440"], ["Personal", "1440"], ["Work", "1440, 30"], ["Health", "1440"], ["Finance", "4320, 1440"], ["Learning", "1440"], ["Custom", "1440"] ];
     sheet.getRange(2, 1, data.length, data[0].length).setValues(data);
 }
 
-
-/**
- * Generates a ULID (Universally Unique Lexicographically Sortable Identifier).
- * Useful for creating unique, time-sortable IDs for tasks.
- * @returns {string} A ULID string.
- */
+/** Generates a ULID. */
 function generateULID() {
   const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
   let lastPushTime = 0;
   const lastRandChars = [];
-  
   return (function() {
     let now = new Date().getTime();
     const duplicateTime = (now === lastPushTime);
     lastPushTime = now;
-    
     const timeStampChars = new Array(8);
     for (var i = 7; i >= 0; i--) {
       timeStampChars[i] = PUSH_CHARS.charAt(now % 64);
       now = Math.floor(now / 64);
     }
-    
     let id = timeStampChars.join('');
-    
     if (!duplicateTime) {
       for (i = 0; i < 12; i++) {
         lastRandChars[i] = Math.floor(Math.random() * 64);
@@ -503,7 +418,6 @@ function generateULID() {
       }
       lastRandChars[i]++;
     }
-    
     for (i = 0; i < 12; i++) {
       id += PUSH_CHARS.charAt(lastRandChars[i]);
     }
