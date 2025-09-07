@@ -199,6 +199,7 @@
                     return;
                 }
                 localStorage.setItem('tasksAppConfig', JSON.stringify(this.config));
+                alert("Settings Saved! The page will now reload.");
                 location.reload(); 
             },
             gapiLoaded() { gapi.load('client', this.initializeGapiClient); },
