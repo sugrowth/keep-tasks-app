@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keep-like Tasks App</title>
+    <title>Keep-like Tasks App (Secure)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         [v-cloak] { display: none; }
+        .modal-bg { background-color: rgba(0,0,0,0.5); }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
 <div id="app" v-cloak class="flex flex-col min-h-screen">
 
-    <!-- Header -->
     <header class="bg-white shadow-sm sticky top-0 z-20">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
@@ -25,157 +25,106 @@
                     <h1 class="text-xl font-semibold ml-3 text-gray-800">My Tasks (Secure)</h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <button v-if="!isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600">Sign in with Google</button>
-                    <button v-else @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Sign Out</button>
+                    <button v-if="isConfigured && !isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600">Sign in with Google</button>
+                    <button v-if="isSignedIn" @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Sign Out</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
-        <!-- Configuration Input -->
         <div v-if="!isConfigured" class="bg-white p-6 rounded-lg shadow-md max-w-xl mx-auto">
-            <h2 class="text-2xl font-bold mb-4">Final Setup</h2>
-            <p class="mb-4 text-gray-600">Please provide your Google Apps Script ID to connect this application.</p>
-            <div class="flex items-center space-x-2">
-                <input v-model="scriptId" placeholder="Paste your Script ID here" class="w-full p-3 border rounded-lg">
-                <button @click="saveScriptId" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg">Save</button>
+            <h2 class="text-2xl font-bold mb-4">Final Secure Setup</h2>
+            <p class="mb-4 text-gray-600">Please provide your credentials. This is stored securely in your browser.</p>
+            <div class="space-y-4">
+                <input v-model="config.clientId" placeholder="Paste your Client ID here" class="w-full p-3 border rounded-lg">
+                <input v-model="config.scriptId" placeholder="Paste your Script ID here" class="w-full p-3 border rounded-lg">
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button @click="saveConfig" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg">Save</button>
             </div>
         </div>
         
-        <!-- App Area -->
-        <div v-if="isConfigured && isSignedIn">
-             <!-- Loading and Error States -->
-            <div v-if="isLoading" class="text-center py-10">
-                <svg class="animate-spin h-8 w-8 text-yellow-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            </div>
-            <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md" role="alert">
-                <p>{{ error }}</p>
-            </div>
-            
-            <!-- Task List (simplified for this example) -->
-            <div v-else class="bg-white p-4 rounded-lg shadow-md">
+        <div v-if="isLoading" class="text-center py-10">
+            <svg class="animate-spin h-8 w-8 text-yellow-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        </div>
+        <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md" role="alert">{{ error }}</div>
+
+        <div v-if="isConfigured && isSignedIn && !isLoading && !error">
+            <div class="bg-white p-4 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-4 text-gray-800">Tasks</h2>
-                <ul>
-                    <li v-for="task in tasks" :key="task.rowIndex" class="p-2 border-b">{{ task.Subject }}</li>
-                </ul>
+                <ul><li v-for="task in tasks" :key="task.rowIndex" class="p-2 border-b">{{ task.Subject }}</li></ul>
             </div>
         </div>
-        <div v-if="isConfigured && !isSignedIn" class="text-center p-8 bg-white rounded-lg shadow">
+        <div v-if="isConfigured && !isSignedIn && !isLoading" class="text-center p-8 bg-white rounded-lg shadow">
             <h2 class="text-xl font-semibold">Please sign in to view your tasks.</h2>
         </div>
     </main>
-
 </div>
 
 <script>
     const { createApp } = Vue;
-
-    // You will need to create an OAuth Client ID in your Google Cloud project for this to work.
-    const CLIENT_ID = 'PASTE_YOUR_OAUTH_CLIENT_ID_HERE'; 
     const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/script.projects';
 
     const app = createApp({
-        data() {
-            return {
-                scriptId: '',
-                isConfigured: false,
-                isLoading: false,
-                error: null,
-                tasks: [],
-                isSignedIn: false,
-                tokenClient: null,
-                gisReady: false, // Flag to track if the GIS library is loaded
-            }
-        },
+        data() { return {
+            config: { clientId: '', scriptId: '' },
+            isConfigured: false, isLoading: true, error: null,
+            tasks: [], isSignedIn: false, tokenClient: null, gisReady: false,
+        }},
         methods: {
             loadConfig() {
-                const savedId = localStorage.getItem('tasksAppScriptId');
-                if (savedId) {
-                    this.scriptId = savedId;
-                    this.isConfigured = true;
+                const savedConfig = localStorage.getItem('tasksAppSecureConfig');
+                if (savedConfig) {
+                    this.config = JSON.parse(savedConfig);
+                    if (this.config.clientId && this.config.scriptId) this.isConfigured = true;
                 }
+                this.isLoading = false;
             },
-            saveScriptId() {
-                if (!this.scriptId) {
-                    alert("Please enter a Script ID.");
-                    return;
-                }
-                localStorage.setItem('tasksAppScriptId', this.scriptId);
+            saveConfig() {
+                if (!this.config.clientId || !this.config.scriptId) { alert("Both fields are required."); return; }
+                localStorage.setItem('tasksAppSecureConfig', JSON.stringify(this.config));
                 this.isConfigured = true;
-                this.error = null;
             },
-            gapiLoaded() {
-                gapi.load('client', this.initializeGapiClient);
-            },
-            gisScriptLoaded() {
-                this.gisReady = true; // Set flag when GIS script is loaded
-            },
+            gapiLoaded() { gapi.load('client', this.initializeGapiClient); },
+            gisScriptLoaded() { this.gisReady = true; },
             async initializeGapiClient() {
-                 // No API key needed for this flow
                 await gapi.client.init({});
-                // Wait for the GIS library to be ready before initializing the token client
                 const interval = setInterval(() => {
-                    if (this.gisReady) {
-                        clearInterval(interval);
-                        this.gisLoaded();
-                    }
+                    if (this.gisReady) { clearInterval(interval); this.gisLoaded(); }
                 }, 100);
             },
             gisLoaded() {
                 this.tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: SCOPES,
+                    client_id: this.config.clientId, scope: SCOPES,
                     callback: (tokenResponse) => {
                         if (tokenResponse && tokenResponse.access_token) {
-                            this.isSignedIn = true;
-                            this.fetchTasks();
-                        }
+                            this.isSignedIn = true; this.fetchTasks();
+                        } else { this.error = "Sign-in failed. Please try again."; }
                     },
                 });
             },
             handleAuthClick() {
-                if (CLIENT_ID.startsWith('PASTE_YOUR')) {
-                    alert('Please configure the CLIENT_ID in index.html first.');
-                    return;
-                }
-                if (this.tokenClient) {
-                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
-                } else {
-                    this.error = "Google authentication is not ready yet. Please wait a moment and try again.";
-                }
+                if (this.tokenClient) this.tokenClient.requestAccessToken({ prompt: 'consent' });
+                else this.error = "Authentication is not ready. Please wait a moment.";
             },
             handleSignoutClick() {
                 const token = gapi.client.getToken();
-                if (token !== null) {
-                    google.accounts.oauth2.revoke(token.access_token, () => {
-                        gapi.client.setToken('');
-                        this.isSignedIn = false;
-                        this.tasks = [];
-                    });
-                }
+                if (token) google.accounts.oauth2.revoke(token.access_token, () => {
+                    gapi.client.setToken(''); this.isSignedIn = false; this.tasks = [];
+                });
             },
             async fetchTasks() {
-                this.isLoading = true;
-                this.error = null;
+                this.isLoading = true; this.error = null;
                 try {
                     const response = await gapi.client.script.scripts.run({
-                        scriptId: this.scriptId,
-                        resource: {
-                            function: 'getTasks'
-                        }
+                        scriptId: this.config.scriptId, resource: { function: 'getTasks' }
                     });
-                    if (response.result.error) {
-                        throw response.result.error;
-                    }
+                    if (response.result.error) throw response.result.error;
                     this.tasks = response.result.response.result;
                 } catch (err) {
-                    this.error = `Error: ${err.details || err.message || JSON.stringify(err)}`;
-                    console.error(err);
-                } finally {
-                    this.isLoading = false;
-                }
+                    this.error = `Error fetching tasks: ${err.details || err.message}`;
+                } finally { this.isLoading = false; }
             }
         },
         mounted() {
@@ -184,10 +133,9 @@
             gapiScript.src = 'https://apis.google.com/js/api.js';
             gapiScript.onload = this.gapiLoaded;
             document.head.appendChild(gapiScript);
-            
             const gisScript = document.createElement('script');
             gisScript.src = 'https://accounts.google.com/gsi/client';
-            gisScript.onload = this.gisScriptLoaded; // Add onload handler for GIS script
+            gisScript.onload = this.gisScriptLoaded;
             document.head.appendChild(gisScript);
         }
     });
