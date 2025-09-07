@@ -27,14 +27,11 @@
  * @returns {ContentService.TextOutput} - JSON response with all tasks.
  */
 function doGet(e) {
-  // Add a check to ensure 'e' and 'e.parameter' are defined
-  if (!e || !e.parameter) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: 'error', message: 'This function is meant to be called from the web app.' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
   try {
+    if (!e || !e.parameter) {
+      throw new Error('This function is meant to be called from the web app.');
+    }
+
     const action = e.parameter.action;
     let data;
 
@@ -46,13 +43,15 @@ function doGet(e) {
 
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', data: data }))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .withHeaders({'Access-Control-Allow-Origin': '*'}); // Add CORS header
 
   } catch (error) {
     Logger.log(error);
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'error', message: error.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .withHeaders({'Access-Control-Allow-Origin': '*'}); // Add CORS header
   }
 }
 
@@ -81,22 +80,24 @@ function doPost(e) {
         throw new Error("Invalid POST action specified.");
     }
 
-    // After a successful write, sync the change to the calendar if applicable
     if (result.rowIndex) {
       syncTaskToCalendar(result.rowIndex);
     }
 
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', data: result }))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .withHeaders({'Access-Control-Allow-Origin': '*'}); // Add CORS header
 
   } catch (error) {
     Logger.log(error);
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'error', message: error.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .withHeaders({'Access-Control-Allow-Origin': '*'}); // Add CORS header
   }
 }
+
 
 // =================================================================================
 // TASK DATA OPERATIONS (CRUD)
