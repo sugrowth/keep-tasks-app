@@ -1,403 +1,286 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Tasks App</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <style>
-        [v-cloak] { display: none; }
-        .modal-bg { background-color: rgba(0,0,0,0.5); }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Keep‑like Tasks App (Sheets ↔ Calendar)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    header { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    input, select, button, textarea { padding:8px; font-size:14px; }
+    button { cursor:pointer; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin:8px 0; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom:1px solid #eee; padding:8px; text-align:left; }
+    th { background:#fafafa; position: sticky; top: 0; }
+    .muted { color:#666; }
+    .chip { display:inline-block; padding:2px 8px; border-radius:999px; background:#f3f3f3; margin-right:6px; }
+    .right { float:right; }
+    .danger { color:#b00020; }
+    .success { color:#006400; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+  </style>
 </head>
-<body class="bg-gray-100">
+<body>
+  <header>
+    <strong>Backend URL:</strong>
+    <input id="webAppUrl" placeholder="https://script.google.com/macros/s/.../exec" style="min-width:420px" />
+    <button onclick="saveUrl()">Save URL</button>
+    <button onclick="testConnection()">Test Connection</button>
+    <span id="status" class="muted"></span>
+  </header>
 
-<div id="app" v-cloak class="min-h-screen">
-    
-    <!-- Header -->
-    <header class="bg-white shadow-sm sticky top-0 z-20">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-bold text-gray-800">My Tasks</h1>
-                <button v-if="isConfigured" 
-                        @click="loadTasks"
-                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                    Refresh
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-6">
-        
-        <!-- Configuration Screen -->
-        <div v-if="!isConfigured" class="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-bold mb-4">Setup Required</h2>
-            <p class="text-gray-600 mb-4">Enter your Google Apps Script Web App URL:</p>
-            
-            <div class="space-y-4">
-                <input v-model="webAppUrl" 
-                       placeholder="https://script.google.com/macros/s/.../exec" 
-                       class="w-full p-3 border rounded-lg">
-                <p class="text-sm text-gray-500">
-                    Get this URL from your Apps Script deployment (Web app type)
-                </p>
-            </div>
-            
-            <button @click="saveConfig" 
-                    :disabled="!webAppUrl"
-                    class="w-full mt-4 bg-blue-500 text-white py-2 rounded hover:bg-blue-600 disabled:bg-gray-400">
-                Save Configuration
-            </button>
-        </div>
-
-        <!-- Loading -->
-        <div v-if="isLoading" class="text-center py-8">
-            <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
-            <p class="mt-2 text-gray-600">Loading...</p>
-        </div>
-
-        <!-- Error Display -->
-        <div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {{ error }}
-            <button @click="error = null" class="ml-2 text-red-500 hover:text-red-700">×</button>
-        </div>
-
-        <!-- Tasks Interface -->
-        <div v-if="isConfigured && !isLoading">
-            
-            <!-- Test Connection -->
-            <div class="mb-4">
-                <button @click="testConnection" 
-                        class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 mr-2">
-                    Test Connection
-                </button>
-                <span v-if="connectionStatus" class="text-sm" :class="connectionStatus.success ? 'text-green-600' : 'text-red-600'">
-                    {{ connectionStatus.message }}
-                </span>
-            </div>
-            
-            <!-- Add Task Button -->
-            <button @click="openTaskModal()" 
-                    class="w-full mb-6 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 flex items-center justify-center">
-                <span class="text-xl mr-2">+</span>
-                Add New Task
-            </button>
-
-            <!-- Tasks List -->
-            <div class="bg-white rounded-lg shadow-md">
-                <div class="p-4 border-b">
-                    <h2 class="text-lg font-semibold">Your Tasks ({{ tasks.length }})</h2>
-                </div>
-                
-                <div v-if="tasks.length === 0" class="p-8 text-center text-gray-500">
-                    <p>No tasks found. Click "Add New Task" to create one!</p>
-                </div>
-                
-                <div v-else class="divide-y">
-                    <div v-for="task in tasks" 
-                         :key="task.ID" 
-                         @click="openTaskModal(task)"
-                         class="p-4 hover:bg-gray-50 cursor-pointer">
-                        <h3 class="font-medium text-gray-900">{{ task.Subject }}</h3>
-                        <p class="text-sm text-gray-600 mt-1">
-                            {{ formatDate(task['Start Date']) }}
-                            <span v-if="task['Start Time']">at {{ task['Start Time'] }}</span>
-                        </p>
-                        <div class="flex items-center mt-2 space-x-2">
-                            <span class="px-2 py-1 text-xs rounded-full"
-                                  :class="getPriorityClass(task.Priority)">
-                                {{ task.Priority }}
-                            </span>
-                            <span class="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
-                                {{ task.Category }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Task Modal -->
-    <div v-if="showModal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h2 class="text-xl font-bold mb-4">{{ editingTask ? 'Edit Task' : 'New Task' }}</h2>
-            
-            <form @submit.prevent="saveTask">
-                <div class="space-y-4">
-                    
-                    <input v-model="currentTask.Subject" 
-                           placeholder="Task subject" 
-                           required
-                           class="w-full p-3 border rounded-lg">
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Start Date</label>
-                            <input v-model="currentTask['Start Date']" 
-                                   type="date" 
-                                   required
-                                   class="w-full p-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Start Time</label>
-                            <input v-model="currentTask['Start Time']" 
-                                   type="time"
-                                   class="w-full p-2 border rounded-lg">
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Priority</label>
-                            <select v-model="currentTask.Priority" class="w-full p-2 border rounded-lg">
-                                <option>Low</option>
-                                <option>Medium</option>
-                                <option>High</option>
-                                <option>Urgent</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Category</label>
-                            <select v-model="currentTask.Category" class="w-full p-2 border rounded-lg">
-                                <option>Tasks</option>
-                                <option>Chores</option>
-                                <option>Important Dates</option>
-                                <option>Deadlines</option>
-                                <option>Meetings</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <textarea v-model="currentTask.Notes" 
-                              placeholder="Notes (optional)" 
-                              rows="3"
-                              class="w-full p-3 border rounded-lg"></textarea>
-                
-                </div>
-                
-                <div class="flex justify-between items-center mt-6">
-                    <button v-if="editingTask" 
-                            type="button" 
-                            @click="deleteCurrentTask"
-                            class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                        Delete
-                    </button>
-                    <div v-else></div>
-                    
-                    <div class="space-x-2">
-                        <button type="button" 
-                                @click="closeModal"
-                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
-                            Cancel
-                        </button>
-                        <button type="submit" 
-                                class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                            Save
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
+  <div class="card">
+    <h3>Settings</h3>
+    <div class="grid">
+      <label>Sheet ID<br/><input id="sheetId" placeholder="1abcDEF..."/></label>
+      <label>Target Calendar ID<br/><input id="calendarId" placeholder="primary or your@domain.com"/></label>
+      <label>Default Timezone<br/>
+        <input id="defaultTimezone" value="America/Toronto"/>
+      </label>
+      <label>Max Reminders<br/>
+        <input id="maxReminders" type="number" min="1" max="5" value="5"/>
+      </label>
     </div>
+    <div class="row">
+      <button onclick="loadSettings()">Load Settings</button>
+      <button onclick="saveSettings()">Save Settings</button>
+      <button onclick="initTemplate()">Initialize Template</button>
+    </div>
+  </div>
 
-</div>
+  <div class="card">
+    <h3>Create / Edit Task</h3>
+    <div class="grid">
+      <label>Subject<br/><input id="t_subject"/></label>
+      <label>Start Date (YYYY-MM-DD)<br/><input id="t_startDate" placeholder="2025-09-07"/></label>
+      <label>All‑day?<br/>
+        <select id="t_allDay" onchange="toggleAllDay()">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </label>
+      <label>Start Time (HH:MM)<br/><input id="t_startTime" placeholder="08:00"/></label>
+      <label>End Date (optional)<br/><input id="t_endDate" placeholder="2025-09-07"/></label>
+      <label>End Time (HH:MM)<br/><input id="t_endTime" placeholder="20:00"/></label>
+      <label>Category<br/>
+        <select id="t_category">
+          <option>Tasks</option><option>Chores</option><option>Important Dates</option><option>Deadlines</option>
+          <option>Meetings</option><option>Recharge</option><option>Subscriptions</option><option>Information</option>
+          <option>Personal</option><option>Work</option><option>Health</option><option>Finance</option>
+          <option>Learning</option><option>Custom</option>
+        </select>
+      </label>
+      <label>Priority<br/>
+        <select id="t_priority">
+          <option>Medium</option><option>Low</option><option>High</option><option>Urgent</option>
+        </select>
+      </label>
+      <label>Recurrence (RRULE)<br/><input id="t_rrule" placeholder="FREQ=WEEKLY;BYDAY=MO,WE"/></label>
+      <label>Repeat Count<br/><input id="t_repeatCount" type="number" min="1" max="1000"/></label>
+      <label>Tags (comma‑separated)<br/><input id="t_tags"/></label>
+      <label>Notes<br/><textarea id="t_notes" rows="2"></textarea></label>
+    </div>
+    <div class="row">
+      <button onclick="createTask()">Create Task</button>
+      <span class="muted">Time rules: if both times empty → defaults to 08:00→20:00; all‑day leaves times blank.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Tasks</h3>
+    <div class="row">
+      <button onclick="loadTasks()">Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>All‑day</th>
+          <th>Cat</th>
+          <th>Pri</th>
+          <th>Recurrence</th>
+          <th>Done?</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tasksTbody"></tbody>
+    </table>
+  </div>
 
 <script>
-    const { createApp, ref, computed, onMounted } = Vue;
-    
-    createApp({
-        setup() {
-            // State
-            const webAppUrl = ref('');
-            const isConfigured = ref(false);
-            const isLoading = ref(false);
-            const error = ref(null);
-            const tasks = ref([]);
-            const showModal = ref(false);
-            const editingTask = ref(null);
-            const currentTask = ref({});
-            const connectionStatus = ref(null);
-            
-            // Config Management
-            const loadConfig = () => {
-                const saved = localStorage.getItem('webAppUrl');
-                if (saved) {
-                    webAppUrl.value = saved;
-                    isConfigured.value = true;
-                }
-            };
-            
-            const saveConfig = () => {
-                localStorage.setItem('webAppUrl', webAppUrl.value);
-                isConfigured.value = true;
-                testConnection();
-            };
-            
-            // API Calls
-            const callWebApp = async (action, payload = null, method = 'GET') => {
-                try {
-                    let url = webAppUrl.value;
-                    let options = {
-                        method: method,
-                        mode: 'cors',
-                        cache: 'no-cache'
-                    };
-                    
-                    if (method === 'GET') {
-                        url += `?action=${action}`;
-                    } else {
-                        options.headers = {
-                            'Content-Type': 'application/json',
-                        };
-                        options.body = JSON.stringify({
-                            action: action,
-                            payload: payload
-                        });
-                    }
-                    
-                    console.log(`Making ${method} request to:`, url);
-                    if (payload) console.log('Payload:', payload);
-                    
-                    const response = await fetch(url, options);
-                    const data = await response.json();
-                    
-                    console.log('Response:', data);
-                    
-                    if (!data.success) {
-                        throw new Error(data.data?.error || 'Request failed');
-                    }
-                    
-                    return data.data;
-                    
-                } catch (err) {
-                    console.error(`Error calling ${action}:`, err);
-                    throw err;
-                }
-            };
-            
-            // Connection Test
-            const testConnection = async () => {
-                isLoading.value = true;
-                error.value = null;
-                try {
-                    const result = await callWebApp('testConnection');
-                    connectionStatus.value = { success: true, message: `Connected to: ${result.spreadsheet}` };
-                    loadTasks();
-                } catch (err) {
-                    connectionStatus.value = { success: false, message: `Connection failed: ${err.message}` };
-                    error.value = `Connection test failed: ${err.message}`;
-                } finally {
-                    isLoading.value = false;
-                }
-            };
-            
-            // Task Operations
-            const loadTasks = async () => {
-                isLoading.value = true;
-                error.value = null;
-                try {
-                    tasks.value = await callWebApp('getTasks');
-                    console.log('Loaded tasks:', tasks.value);
-                } catch (err) {
-                    error.value = `Failed to load tasks: ${err.message}`;
-                } finally {
-                    isLoading.value = false;
-                }
-            };
-            
-            const saveTask = async () => {
-                isLoading.value = true;
-                error.value = null;
-                try {
-                    if (editingTask.value) {
-                        await callWebApp('updateTask', currentTask.value, 'POST');
-                    } else {
-                        await callWebApp('createTask', currentTask.value, 'POST');
-                    }
-                    closeModal();
-                    await loadTasks();
-                } catch (err) {
-                    error.value = `Failed to save task: ${err.message}`;
-                } finally {
-                    isLoading.value = false;
-                }
-            };
-            
-            const deleteCurrentTask = async () => {
-                if (!confirm('Delete this task?')) return;
-                
-                isLoading.value = true;
-                try {
-                    await callWebApp('deleteTask', { rowIndex: editingTask.value.rowIndex }, 'POST');
-                    closeModal();
-                    await loadTasks();
-                } catch (err) {
-                    error.value = `Failed to delete task: ${err.message}`;
-                } finally {
-                    isLoading.value = false;
-                }
-            };
-            
-            // Modal Management
-            const openTaskModal = (task = null) => {
-                if (task) {
-                    editingTask.value = task;
-                    currentTask.value = { ...task };
-                } else {
-                    editingTask.value = null;
-                    currentTask.value = {
-                        Subject: '',
-                        'Start Date': new Date().toISOString().split('T')[0],
-                        'Start Time': '',
-                        Priority: 'Medium',
-                        Category: 'Tasks',
-                        Notes: ''
-                    };
-                }
-                showModal.value = true;
-            };
-            
-            const closeModal = () => {
-                showModal.value = false;
-                editingTask.value = null;
-                currentTask.value = {};
-            };
-            
-            // Utility Functions
-            const formatDate = (dateStr) => {
-                if (!dateStr) return 'No date';
-                return new Date(dateStr + 'T00:00:00').toLocaleDateString();
-            };
-            
-            const getPriorityClass = (priority) => {
-                const classes = {
-                    'Low': 'bg-gray-100 text-gray-700',
-                    'Medium': 'bg-blue-100 text-blue-700',
-                    'High': 'bg-yellow-100 text-yellow-700',
-                    'Urgent': 'bg-red-100 text-red-700'
-                };
-                return classes[priority] || classes['Medium'];
-            };
-            
-            // Initialize
-            onMounted(() => {
-                loadConfig();
-            });
-            
-            return {
-                webAppUrl, isConfigured, isLoading, error, tasks, 
-                showModal, editingTask, currentTask, connectionStatus,
-                saveConfig, testConnection, loadTasks, saveTask, deleteCurrentTask,
-                openTaskModal, closeModal, formatDate, getPriorityClass
-            };
-        }
-    }).mount('#app');
-</script>
+  const state = {
+    url: localStorage.getItem('webAppUrl') || ''
+  };
+  document.getElementById('webAppUrl').value = state.url;
 
+  function saveUrl(){
+    state.url = document.getElementById('webAppUrl').value.trim();
+    localStorage.setItem('webAppUrl', state.url);
+    setStatus('Saved.', 'success');
+  }
+  function setStatus(msg, cls){
+    const el = document.getElementById('status');
+    el.textContent = msg; el.className = cls || 'muted';
+  }
+
+  async function callWebApp(action, payload=null, method='POST'){
+    if(!state.url) throw new Error('Set the Backend URL first.');
+    let url = state.url;
+    const options = { method, headers: {}, cache: 'no-store' };
+    if(method === 'GET'){
+      const u = new URL(url);
+      u.searchParams.set('action', action);
+      if(payload) u.searchParams.set('payload', JSON.stringify(payload));
+      url = u.toString();
+    } else {
+      const params = new URLSearchParams();
+      params.set('action', action);
+      if(payload) params.set('payload', JSON.stringify(payload));
+      options.headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+      options.body = params.toString();
+    }
+
+    const resp = await fetch(url, options);
+    const ct = (resp.headers.get('content-type') || '').toLowerCase();
+    if(!ct.includes('application/json')){
+      const text = await resp.text();
+      throw new Error(`Expected JSON, got ${ct}. First 100 chars: ${text.slice(0,100)}`);
+    }
+    const data = await resp.json();
+    if(!data.success) throw new Error(data.data && data.data.error || 'Unknown server error');
+    return data.data;
+  }
+
+  async function testConnection(){
+    try{
+      const out = await callWebApp('testConnection', null, 'POST');
+      setStatus(`Connected to "${out.spreadsheetName}" (v${out.version}).`, 'success');
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  async function loadSettings(){
+    try{
+      const s = await callWebApp('getSettings');
+      document.getElementById('sheetId').value = s.sheetId || '';
+      document.getElementById('calendarId').value = s.calendarId || '';
+      document.getElementById('defaultTimezone').value = s.defaultTimezone || 'America/Toronto';
+      document.getElementById('maxReminders').value = s.maxReminders || 5;
+      setStatus('Settings loaded.', 'success');
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  async function saveSettings(){
+    try{
+      const s = {
+        sheetId: document.getElementById('sheetId').value.trim(),
+        calendarId: document.getElementById('calendarId').value.trim(),
+        defaultTimezone: document.getElementById('defaultTimezone').value.trim() || 'America/Toronto',
+        maxReminders: Math.min(5, Math.max(1, parseInt(document.getElementById('maxReminders').value||'5',10))),
+      };
+      await callWebApp('setSettings', s);
+      setStatus('Settings saved.', 'success');
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  async function initTemplate(){
+    try{ await callWebApp('initTemplate'); setStatus('Template initialized.', 'success'); }
+    catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  function toggleAllDay(){
+    const allDay = document.getElementById('t_allDay').value === 'true';
+    const st = document.getElementById('t_startTime');
+    const et = document.getElementById('t_endTime');
+    st.disabled = allDay; et.disabled = allDay;
+    if(allDay){ st.value=''; et.value=''; }
+  }
+
+  async function createTask(){
+    try{
+      const payload = {
+        'Subject': document.getElementById('t_subject').value.trim(),
+        'Start Date': document.getElementById('t_startDate').value.trim(),
+        'End Date': document.getElementById('t_endDate').value.trim(),
+        'Start Time': document.getElementById('t_startTime').value.trim(),
+        'End Time': document.getElementById('t_endTime').value.trim(),
+        'Category': document.getElementById('t_category').value,
+        'Priority': document.getElementById('t_priority').value,
+        'Recurrence': document.getElementById('t_rrule').value.trim(),
+        'Repeat Count': document.getElementById('t_repeatCount').value.trim(),
+        'Tags': document.getElementById('t_tags').value.trim(),
+        'Notes': document.getElementById('t_notes').value.trim(),
+        '__allDay': document.getElementById('t_allDay').value === 'true'
+      };
+      await callWebApp('createTask', payload);
+      setStatus('Task created.', 'success');
+      clearTaskForm();
+      loadTasks();
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  function clearTaskForm(){
+    ['t_subject','t_startDate','t_endDate','t_startTime','t_endTime','t_rrule','t_repeatCount','t_tags','t_notes'].forEach(id=>{
+      document.getElementById(id).value='';
+    });
+    document.getElementById('t_category').value='Tasks';
+    document.getElementById('t_priority').value='Medium';
+    document.getElementById('t_allDay').value='false';
+    toggleAllDay();
+  }
+
+  async function loadTasks(){
+    try{
+      const list = await callWebApp('getTasks');
+      const tbody = document.getElementById('tasksTbody');
+      tbody.innerHTML='';
+      list.forEach(t => {
+        const tr = document.createElement('tr');
+        const startStr = t['Start Date'] + (t['Start Time']? (' ' + t['Start Time']) : '');
+        const endStr = (t['End Date']||'') + (t['End Time']? (' ' + t['End Time']) : '');
+        const isAllDay = !t['Start Time'] && !t['End Time'];
+        tr.innerHTML = `
+          <td>${escapeHtml(t['Subject']||'')}</td>
+          <td>${escapeHtml(startStr)}</td>
+          <td>${escapeHtml(endStr)}</td>
+          <td>${isAllDay ? 'Yes' : 'No'}</td>
+          <td>${escapeHtml(t['Category']||'')}</td>
+          <td>${escapeHtml(t['Priority']||'')}</td>
+          <td><span class="muted">${escapeHtml(t['Recurrence']||'')}</span></td>
+          <td><input type="checkbox" ${t['Is it Completed']? 'checked' : ''} onchange="toggleDone(${t._rowIndex}, this.checked)"/></td>
+          <td><button onclick="removeTask(${t._rowIndex})">Delete</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  async function toggleDone(rowIndex, checked){
+    try{
+      // minimal update: only Is it Completed
+      await callWebApp('updateTask', { _rowIndex: rowIndex, 'Is it Completed': !!checked });
+      setStatus('Updated.', 'success');
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  async function removeTask(rowIndex){
+    if(!confirm('Delete this task (and its calendar event)?')) return;
+    try{
+      await callWebApp('deleteTask', { _rowIndex: rowIndex });
+      setStatus('Deleted.', 'success');
+      loadTasks();
+    }catch(e){ setStatus(e.message, 'danger'); }
+  }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+  }
+
+  // eager load settings/tasks if URL already saved
+  if(state.url){ loadSettings().then(loadTasks).catch(()=>{}); }
+</script>
 </body>
 </html>
