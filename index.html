@@ -10,7 +10,6 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         [v-cloak] { display: none; }
-        .modal-bg { background-color: rgba(0,0,0,0.5); }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -22,10 +21,12 @@
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center">
-                    <svg class="h-8 w-8 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                    <h1 class="text-xl font-semibold ml-3 text-gray-800">My Tasks</h1>
+                    <svg class="h-8 w-8 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                    <h1 class="text-xl font-semibold ml-3 text-gray-800">My Tasks (Secure)</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button v-if="!isSignedIn" @click="handleAuthClick" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600">Sign in with Google</button>
+                    <button v-else @click="handleSignoutClick" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Sign Out</button>
                 </div>
             </div>
         </div>
@@ -35,249 +36,161 @@
     <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
         <!-- Configuration Input -->
         <div v-if="!isConfigured" class="bg-white p-6 rounded-lg shadow-md max-w-xl mx-auto">
-            <h2 class="text-2xl font-bold mb-4">Welcome!</h2>
-            <p class="mb-4 text-gray-600">Please deploy your Google Apps Script as a Web App and paste the URL below to connect this application to your Google Sheet.</p>
+            <h2 class="text-2xl font-bold mb-4">Final Setup</h2>
+            <p class="mb-4 text-gray-600">Please provide your Google Apps Script ID to connect this application.</p>
             <div class="flex items-center space-x-2">
-                <input v-model="scriptUrl" placeholder="Paste your Web App URL here" class="w-full p-3 border rounded-lg">
-                <button @click="saveScriptUrl" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg">Connect</button>
+                <input v-model="scriptId" placeholder="Paste your Script ID here" class="w-full p-3 border rounded-lg">
+                <button @click="saveScriptId" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg">Save</button>
             </div>
         </div>
-
-        <!-- Loading and Error States -->
-        <div v-if="isLoading" class="text-center py-10">
-            <svg class="animate-spin h-8 w-8 text-yellow-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            <p class="mt-4 text-lg font-medium text-gray-600">Loading...</p>
-        </div>
-        <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md" role="alert">
-            <p class="font-bold">Error</p>
-            <p>{{ error }}</p>
-        </div>
-
-        <!-- Task Management Area -->
-        <div v-if="isConfigured && !isLoading && !error">
-            <div class="mb-6">
-                <button @click="openTaskModal(null)" class="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg shadow-sm flex items-center justify-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-                    <span>Add a new task</span>
-                </button>
+        
+        <!-- App Area -->
+        <div v-if="isConfigured && isSignedIn">
+             <!-- Loading and Error States -->
+            <div v-if="isLoading" class="text-center py-10">
+                <svg class="animate-spin h-8 w-8 text-yellow-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
             </div>
-            <div class="bg-white p-4 rounded-lg shadow-md">
-                 <h2 class="text-2xl font-bold mb-4 text-gray-800">Tasks</h2>
-                 <div v-if="tasks.length === 0" class="text-center py-10 text-gray-500">
-                    <p>No tasks found. Add one to get started!</p>
-                 </div>
-                 <ul v-else class="space-y-3">
-                    <li v-for="task in tasks" :key="task._TaskID" @click="openTaskModal(task)" class="p-4 border rounded-lg hover:shadow-md hover:border-yellow-500 cursor-pointer transition-shadow duration-150 bg-gray-50 flex items-start justify-between">
-                        <div class="flex items-start">
-                            <input type="checkbox" :checked="task['Is it Completed'] === true" @click.stop="toggleComplete(task)" class="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500">
-                            <div class="ml-4">
-                                <p class="font-semibold text-lg text-gray-900" :class="{ 'line-through text-gray-500': task['Is it Completed'] === true }">{{ task.Subject }}</p>
-                                <p class="text-sm text-gray-600">{{ formatTaskDate(task) }}</p>
-                            </div>
-                        </div>
-                    </li>
-                 </ul>
+            <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-md" role="alert">
+                <p>{{ error }}</p>
             </div>
+            
+            <!-- Task List (simplified for this example) -->
+            <div v-else class="bg-white p-4 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Tasks</h2>
+                <ul>
+                    <li v-for="task in tasks" :key="task.rowIndex" class="p-2 border-b">{{ task.Subject }}</li>
+                </ul>
+            </div>
+        </div>
+        <div v-if="isConfigured && !isSignedIn" class="text-center p-8 bg-white rounded-lg shadow">
+            <h2 class="text-xl font-semibold">Please sign in to view your tasks.</h2>
         </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-white mt-8 py-4 border-t">
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500 text-sm">
-            Keep-like Tasks App | Powered by Google Apps Script
-        </div>
-    </footer>
-
-    <!-- Task Modal -->
-    <div v-if="showTaskModal" class="fixed inset-0 modal-bg flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 max-h-screen overflow-y-auto" @click.away="closeTaskModal">
-            <h2 class="text-2xl font-bold mb-4">{{ editingTask ? 'Edit Task' : 'Add New Task' }}</h2>
-            <form @submit.prevent="saveTask">
-                <div class="space-y-4">
-                    <input type="text" placeholder="Subject" v-model="currentTask.Subject" class="w-full p-3 border border-gray-300 rounded-lg" required>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="date" v-model="currentTask['Start Date']" class="w-full p-3 border border-gray-300 rounded-lg" required>
-                        <input type="time" v-model="currentTask['Start Time']" class="w-full p-3 border border-gray-300 rounded-lg">
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="date" v-model="currentTask['End Date']" class="w-full p-3 border border-gray-300 rounded-lg">
-                        <input type="time" v-model="currentTask['End Time']" class="w-full p-3 border border-gray-300 rounded-lg">
-                    </div>
-                    <textarea placeholder="Notes" v-model="currentTask.Notes" class="w-full p-3 border border-gray-300 rounded-lg" rows="3"></textarea>
-                </div>
-                <div class="flex justify-between items-center mt-6">
-                    <div>
-                        <button v-if="editingTask" type="button" @click="deleteTask" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Delete</button>
-                    </div>
-                    <div class="flex space-x-3">
-                        <button type="button" @click="closeTaskModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Save Task</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
 </div>
 
 <script>
     const { createApp } = Vue;
 
+    // You will need to create an OAuth Client ID in your Google Cloud project for this to work.
+    const CLIENT_ID = 'PASTE_YOUR_OAUTH_CLIENT_ID_HERE'; 
+    const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/script.projects';
+
     const app = createApp({
         data() {
             return {
-                scriptUrl: '',
+                scriptId: '',
                 isConfigured: false,
                 isLoading: false,
                 error: null,
                 tasks: [],
-                showTaskModal: false,
-                editingTask: null,
-                currentTask: {},
+                isSignedIn: false,
+                tokenClient: null,
+                gisReady: false, // Flag to track if the GIS library is loaded
             }
         },
         methods: {
             loadConfig() {
-                const savedUrl = localStorage.getItem('tasksAppScriptUrl');
-                if (savedUrl) {
-                    this.scriptUrl = savedUrl;
+                const savedId = localStorage.getItem('tasksAppScriptId');
+                if (savedId) {
+                    this.scriptId = savedId;
                     this.isConfigured = true;
-                    this.fetchTasks();
                 }
             },
-            saveScriptUrl() {
-                if (!this.scriptUrl || !this.scriptUrl.startsWith('https://script.google.com/')) {
-                    this.error = "Please enter a valid Google Apps Script Web App URL.";
+            saveScriptId() {
+                if (!this.scriptId) {
+                    alert("Please enter a Script ID.");
                     return;
                 }
-                localStorage.setItem('tasksAppScriptUrl', this.scriptUrl);
+                localStorage.setItem('tasksAppScriptId', this.scriptId);
                 this.isConfigured = true;
                 this.error = null;
-                this.fetchTasks();
+            },
+            gapiLoaded() {
+                gapi.load('client', this.initializeGapiClient);
+            },
+            gisScriptLoaded() {
+                this.gisReady = true; // Set flag when GIS script is loaded
+            },
+            async initializeGapiClient() {
+                 // No API key needed for this flow
+                await gapi.client.init({});
+                // Wait for the GIS library to be ready before initializing the token client
+                const interval = setInterval(() => {
+                    if (this.gisReady) {
+                        clearInterval(interval);
+                        this.gisLoaded();
+                    }
+                }, 100);
+            },
+            gisLoaded() {
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            this.isSignedIn = true;
+                            this.fetchTasks();
+                        }
+                    },
+                });
+            },
+            handleAuthClick() {
+                if (CLIENT_ID.startsWith('PASTE_YOUR')) {
+                    alert('Please configure the CLIENT_ID in index.html first.');
+                    return;
+                }
+                if (this.tokenClient) {
+                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+                } else {
+                    this.error = "Google authentication is not ready yet. Please wait a moment and try again.";
+                }
+            },
+            handleSignoutClick() {
+                const token = gapi.client.getToken();
+                if (token !== null) {
+                    google.accounts.oauth2.revoke(token.access_token, () => {
+                        gapi.client.setToken('');
+                        this.isSignedIn = false;
+                        this.tasks = [];
+                    });
+                }
             },
             async fetchTasks() {
                 this.isLoading = true;
                 this.error = null;
                 try {
-                    const response = await fetch(`${this.scriptUrl}?action=getTasks`);
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        this.tasks = result.data;
-                    } else {
-                        throw new Error(result.message);
-                    }
-                } catch (err) {
-                    this.error = `Failed to load tasks: ${err.message}. Please check your script URL and deployment permissions.`;
-                } finally {
-                    this.isLoading = false;
-                }
-            },
-            openTaskModal(task) {
-                if(task){
-                    this.editingTask = task;
-                    // Create a deep copy for editing
-                    this.currentTask = JSON.parse(JSON.stringify(task));
-                } else {
-                    this.editingTask = null;
-                    this.currentTask = { 
-                        Subject: '', 
-                        'Start Date': new Date().toISOString().split('T')[0],
-                        'Is it Completed': false,
-                    };
-                }
-                this.showTaskModal = true;
-            },
-            closeTaskModal() { this.showTaskModal = false; },
-            async saveTask() {
-                this.isLoading = true;
-                this.closeTaskModal();
-                const action = this.editingTask ? 'updateTask' : 'createTask';
-                try {
-                    const response = await fetch(this.scriptUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: action, payload: this.currentTask }),
-                        headers: { 'Content-Type': 'application/json' },
+                    const response = await gapi.client.script.scripts.run({
+                        scriptId: this.scriptId,
+                        resource: {
+                            function: 'getTasks'
+                        }
                     });
-                    const result = await response.json();
-                    if (result.status !== 'success') {
-                        throw new Error(result.message);
+                    if (response.result.error) {
+                        throw response.result.error;
                     }
-                    await this.fetchTasks(); // Refresh the list
+                    this.tasks = response.result.response.result;
                 } catch (err) {
-                    this.error = `Failed to save task: ${err.message}`;
+                    this.error = `Error: ${err.details || err.message || JSON.stringify(err)}`;
+                    console.error(err);
                 } finally {
                     this.isLoading = false;
-                }
-            },
-            async toggleComplete(task) {
-                 // Create a copy to modify
-                const updatedTask = JSON.parse(JSON.stringify(task));
-                updatedTask['Is it Completed'] = !updatedTask['Is it Completed'];
-                this.isLoading = true;
-                try {
-                     const response = await fetch(this.scriptUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'updateTask', payload: updatedTask }),
-                        headers: { 'Content-Type': 'application/json' },
-                    });
-                    const result = await response.json();
-                     if (result.status !== 'success') {
-                        throw new Error(result.message);
-                    }
-                    // Update local task instead of full refetch for speed
-                    const taskIndex = this.tasks.findIndex(t => t.rowIndex === task.rowIndex);
-                    if (taskIndex !== -1) {
-                        this.tasks[taskIndex]['Is it Completed'] = updatedTask['Is it Completed'];
-                    }
-                } catch (err) {
-                     this.error = `Failed to update task status: ${err.message}`;
-                } finally {
-                    this.isLoading = false;
-                }
-            },
-             async deleteTask() {
-                if (!this.editingTask || !confirm(`Are you sure you want to delete "${this.editingTask.Subject}"?`)) {
-                    return;
-                }
-                 this.isLoading = true;
-                this.closeTaskModal();
-                 try {
-                     const response = await fetch(this.scriptUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'deleteTask', payload: { rowIndex: this.editingTask.rowIndex } }),
-                        headers: { 'Content-Type': 'application/json' },
-                    });
-                    const result = await response.json();
-                     if (result.status !== 'success') {
-                        throw new Error(result.message);
-                    }
-                    await this.fetchTasks();
-                } catch (err) {
-                     this.error = `Failed to delete task: ${err.message}`;
-                } finally {
-                    this.isLoading = false;
-                }
-            },
-            formatTaskDate(task) {
-                if (!task['Start Date']) return 'No date';
-                try {
-                    let date = new Date(task['Start Date']);
-                    let options = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' };
-                    let dateStr = date.toLocaleDateString(undefined, options);
-                    
-                    if (task['Start Time']) {
-                        dateStr += ` at ${task['Start Time']}`;
-                    }
-                    return dateStr;
-                } catch (e) {
-                    return task['Start Date']; // Fallback for invalid date
                 }
             }
         },
         mounted() {
             this.loadConfig();
+            const gapiScript = document.createElement('script');
+            gapiScript.src = 'https://apis.google.com/js/api.js';
+            gapiScript.onload = this.gapiLoaded;
+            document.head.appendChild(gapiScript);
+            
+            const gisScript = document.createElement('script');
+            gisScript.src = 'https://accounts.google.com/gsi/client';
+            gisScript.onload = this.gisScriptLoaded; // Add onload handler for GIS script
+            document.head.appendChild(gisScript);
         }
     });
-
     app.mount('#app');
 </script>
 </body>
